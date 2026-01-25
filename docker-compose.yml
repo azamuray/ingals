@@ -16,6 +16,7 @@ services:
       - JWT_ALGORITHM=${JWT_ALGORITHM}
       - FORCE_HTTPS=${FORCE_HTTPS}
       - PYTHONUNBUFFERED=1
+      - WINNING_SCORE=${WINNING_SCORE}
     volumes:
       - ./backend:/app
       - db-data:/app/data # Persistent volume for database
@@ -35,6 +36,7 @@ services:
       - VIRTUAL_HOST=${VIRTUAL_HOST}
       - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - WINNING_SCORE=${WINNING_SCORE}
     volumes:
       - ./frontend:/usr/share/nginx/html
       - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf

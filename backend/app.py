@@ -18,7 +18,7 @@ socketio = SocketIO(app, cors_allowed_origins="*") # Allow CORS for devosh-style
 SSO_LOGIN_URL = os.getenv('SSO_LOGIN_URL', 'http://localhost:8001/login')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'supersecretkeyformvpdev') # Shared with Chuvala
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
-WINNING_SCORE = int(os.getenv('WINNING_SCORE', 15))
+WINNING_SCORE = int(os.getenv('WINNING_SCORE', 10))
 
 # --- Bot Configuration ---
 import threading
@@ -78,6 +78,45 @@ def init_db():
                 email TEXT PRIMARY KEY,
                 name TEXT,
                 elo INTEGER DEFAULT 1200
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS friendships (
+                user_email TEXT,
+                friend_email TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_email, friend_email),
+                FOREIGN KEY(user_email) REFERENCES users(email),
+                FOREIGN KEY(friend_email) REFERENCES users(email)
+            )
+
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS games (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player1_email TEXT,
+                player2_email TEXT,
+                player1_score INTEGER,
+                player2_score INTEGER,
+                winner_email TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(player1_email) REFERENCES users(email),
+                FOREIGN KEY(player2_email) REFERENCES users(email)
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_words (
+                user_email TEXT,
+                word TEXT,
+                correct_count INTEGER DEFAULT 0,
+                wrong_count INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'learning', -- 'learning' or 'learned'
+                last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_email, word),
+                FOREIGN KEY(user_email) REFERENCES users(email)
             )
         ''')
         
@@ -154,10 +193,15 @@ def api_me():
         db = get_db()
         row = db.execute('SELECT name, elo FROM users WHERE email = ?', (user['email'],)).fetchone()
         
+        # Fetch friends
+        friends_rows = db.execute('SELECT friend_email FROM friendships WHERE user_email = ?', (user['email'],)).fetchall()
+        friends = [r['friend_email'] for r in friends_rows]
+
         user_data = {
             'email': user['email'],
             'name': row['name'] if row else None,
-            'elo': row['elo'] if row else 1200
+            'elo': row['elo'] if row else 1200,
+            'friends': friends
         }
         
         # If user not in DB, create them
@@ -167,6 +211,155 @@ def api_me():
             
         return jsonify(user_data)
     return jsonify(None), 401
+
+@app.route('/api/friends/add', methods=['POST'])
+def add_friend():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    data = request.json
+    friend_email = data.get('friend_email')
+    
+    if not friend_email:
+        return jsonify({'error': 'Missing friend_email'}), 400
+        
+    if friend_email == user['email']:
+        return jsonify({'error': 'Cannot add yourself'}), 400
+
+    db = get_db()
+    try:
+        db.execute('INSERT OR IGNORE INTO friendships (user_email, friend_email) VALUES (?, ?)', 
+                  (user['email'], friend_email))
+        db.commit()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        print(f"Error adding friend: {e}")
+        return jsonify({'error': 'Database error'}), 500
+
+@app.route('/api/friends/remove', methods=['POST'])
+def remove_friend():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    data = request.json
+    friend_email = data.get('friend_email')
+    
+    if not friend_email:
+        return jsonify({'error': 'Missing friend_email'}), 400
+
+    db = get_db()
+    try:
+        db.execute('DELETE FROM friendships WHERE user_email = ? AND friend_email = ?', 
+                  (user['email'], friend_email))
+        db.commit()
+        return jsonify({'status': 'ok'})
+    except Exception as e:
+        print(f"Error removing friend: {e}")
+        return jsonify({'error': 'Database error'}), 500
+
+@app.route('/api/profile/<identifier>')
+def get_public_profile(identifier):
+    current = get_current_user()
+    if not current:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    target_email = current['email'] if identifier == 'me' else identifier
+    
+    db = get_db()
+    
+    # User Info
+    user_row = db.execute('SELECT name, elo FROM users WHERE email = ?', (target_email,)).fetchone()
+    if not user_row:
+        # Check if it's a bot
+        bot_config = next((b for b in BOTS if b['email'] == target_email), None)
+        if bot_config:
+             return jsonify({
+                'email': target_email,
+                'name': bot_config['name'],
+                'elo': bot_config['elo'], # Static ELO for profile? Or dynamic from DB? Use DB if available.
+                'stats': {'total_games': 999, 'wins': 500, 'losses': 499}, # Fake stats for bots
+                'is_friend': True, # Bots are friends
+                'is_me': False
+             })
+        return jsonify({'error': 'User not found'}), 404
+        
+    # Stats
+    games_rows = db.execute('''
+        SELECT count(*) as total, 
+        sum(case when winner_email = ? then 1 else 0 end) as wins 
+        FROM games 
+        WHERE player1_email = ? OR player2_email = ?
+    ''', (target_email, target_email, target_email)).fetchone()
+    
+    total_games = games_rows['total']
+    wins = games_rows['wins'] or 0
+    losses = total_games - wins
+    
+    # Is Friend?
+    is_friend = False
+    if current['email'] != target_email:
+        friend_row = db.execute('SELECT 1 FROM friendships WHERE user_email = ? AND friend_email = ?', 
+                               (current['email'], target_email)).fetchone()
+        is_friend = bool(friend_row)
+        
+    return jsonify({
+        'email': target_email,
+        'name': user_row['name'] or target_email,
+        'elo': user_row['elo'],
+        'stats': {
+            'total_games': total_games,
+            'wins': wins,
+            'losses': losses
+        },
+        'is_friend': is_friend,
+        'is_me': current['email'] == target_email
+    })
+
+@app.route('/api/me/stats')
+def get_my_stats():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+        
+    db = get_db()
+    
+    # Words
+    words_rows = db.execute('SELECT word, correct_count, wrong_count, last_seen FROM user_words WHERE user_email = ? ORDER BY last_seen DESC', (user['email'],)).fetchall()
+    words = [dict(row) for row in words_rows]
+    
+    # History (Last 20 games)
+    history_rows = db.execute('''
+        SELECT id, player1_email, player2_email, player1_score, player2_score, winner_email, created_at 
+        FROM games 
+        WHERE player1_email = ? OR player2_email = ? 
+        ORDER BY created_at DESC LIMIT 20
+    ''', (user['email'], user['email'])).fetchall()
+    
+    history = []
+    for row in history_rows:
+        # Determine opponent
+        is_p1 = row['player1_email'] == user['email']
+        opponent_email = row['player2_email'] if is_p1 else row['player1_email']
+        
+        # Get opponent name
+        opp_row = db.execute('SELECT name FROM users WHERE email = ?', (opponent_email,)).fetchone()
+        opponent_name = opp_row['name'] if opp_row else opponent_email
+        
+        history.append({
+            'opponent_name': opponent_name,
+            'opponent_email': opponent_email,
+            'my_score': row['player1_score'] if is_p1 else row['player2_score'],
+            'opponent_score': row['player2_score'] if is_p1 else row['player1_score'],
+            'won': row['winner_email'] == user['email'],
+            'date': row['created_at']
+        })
+        
+    return jsonify({
+        'words': words,
+        'history': history
+    })
 
 @app.route('/api/profile', methods=['POST'])
 def update_profile():
@@ -500,18 +693,27 @@ def handle_accept_challenge(data):
 
     active_games[room_id] = game_data
 
+    # Fetch names from DB
+    db = get_db()
+    name1 = db.execute('SELECT name FROM users WHERE email = ?', (email1,)).fetchone()['name'] or email1
+    name2 = db.execute('SELECT name FROM users WHERE email = ?', (email2,)).fetchone()['name'] or email2
+
     socketio.emit('game_start', {
         'word': word,
         'translations': translations,
         'opponent_connected': True,
-        'winning_score': rounds  # Send to frontend
+        'winning_score': rounds,
+        'opponent_name': name2,
+        'opponent_email': email2
     }, room=player1, namespace='/')
 
     socketio.emit('game_start', {
         'word': word,
         'translations': translations,
         'opponent_connected': True,
-        'winning_score': rounds  # Send to frontend
+        'winning_score': rounds,
+        'opponent_name': name1,
+        'opponent_email': email1
     }, room=player2, namespace='/')
     
     # Check if any player is a bot and start bot playing thread
@@ -575,18 +777,27 @@ def start_game_for_bot(challenger_sid, bot_sid, rounds):
         
         active_games[room_id] = game_data
         
+        # Fetch names from DB
+        db = get_db()
+        name1 = db.execute('SELECT name FROM users WHERE email = ?', (email1,)).fetchone()['name'] or email1
+        name2 = db.execute('SELECT name FROM users WHERE email = ?', (email2,)).fetchone()['name'] or email2
+        
         socketio.emit('game_start', {
             'word': word,
             'translations': translations,
             'opponent_connected': True,
-            'winning_score': rounds
+            'winning_score': rounds,
+            'opponent_name': name2,
+            'opponent_email': email2
         }, room=player1, namespace='/')
         
         socketio.emit('game_start', {
             'word': word,
             'translations': translations,
             'opponent_connected': True,
-            'winning_score': rounds
+            'winning_score': rounds,
+            'opponent_name': name1,
+            'opponent_email': email1
         }, room=player2, namespace='/')
         
         # Start bot playing thread
@@ -726,18 +937,29 @@ def bot_play_game(room_id, bot_sid):
                         
                         db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_winner_elo, winner_email))
                         db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_loser_elo, loser_email))
+                        
+                        # Log Game
+                        db.execute('''
+                            INSERT INTO games (player1_email, player2_email, player1_score, player2_score, winner_email)
+                            VALUES (?, ?, ?, ?, ?)
+                        ''', (winner_email, loser_email, game['scores'][winner_sid], game['scores'][loser_sid], winner_email))
+                        
                         db.commit()
                         
+                        # Fetch names for messages
+                        winner_name = db.execute('SELECT name FROM users WHERE email = ?', (winner_email,)).fetchone()['name'] or winner_email
+                        loser_name = db.execute('SELECT name FROM users WHERE email = ?', (loser_email,)).fetchone()['name'] or loser_email
+
                         socketio.emit('game_over', {
                             'winner': True,
-                            'message': 'Игра окончена. Вы проиграли.', # Message for bot win seen by loser
+                            'message': f'Поздравляем! Вы победили: {loser_name} 🏆',
                             'final_scores': game['scores'],
                             'elo_update': {'old': winner_elo, 'new': new_winner_elo}
                         }, room=winner_sid, namespace='/')
                         
                         socketio.emit('game_over', {
                             'winner': False,
-                            'message': 'Игра окончена. Вы проиграли.',
+                            'message': f'Игра окончена. Победил {winner_name} 😔',
                             'final_scores': game['scores'],
                             'elo_update': {'old': loser_elo, 'new': new_loser_elo}
                         }, room=loser_sid, namespace='/')
@@ -884,6 +1106,20 @@ def on_answer(data):
             'you_answered': False
         }, room=opponent, namespace='/')
         
+        # Log Word Stats (Correct)
+        with app.app_context():
+            db = get_db()
+            answering_email = game['emails'].get(request.sid)
+            if answering_email:
+                 db.execute('''
+                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, last_seen)
+                    VALUES (?, ?, 1, 0, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_email, word) DO UPDATE SET
+                    correct_count = correct_count + 1,
+                    last_seen = CURRENT_TIMESTAMP
+                ''', (answering_email, word))
+                 db.commit()
+        
         # Check Win Condition
         # Check Win Condition - use game-specific winning score
         winning_score = game.get('winning_score', WINNING_SCORE)
@@ -917,16 +1153,28 @@ def on_answer(data):
                 db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_loser_elo, loser_email))
                 db.commit()
                 
+                
+                # Fetch names for messages
+                winner_name = db.execute('SELECT name FROM users WHERE email = ?', (winner_email,)).fetchone()['name'] or winner_email
+                loser_name = db.execute('SELECT name FROM users WHERE email = ?', (loser_email,)).fetchone()['name'] or loser_email
+
+                # Log Game
+                db.execute('''
+                    INSERT INTO games (player1_email, player2_email, player1_score, player2_score, winner_email)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (winner_email, loser_email, game['scores'][winner_sid], game['scores'][loser_sid], winner_email))
+                db.commit()
+
                 socketio.emit('game_over', {
                     'winner': True,
-                    'message': 'Поздравляем! Вы победили!',
+                    'message': f'Поздравляем! Вы победили: {loser_name} 🏆',
                     'final_scores': game['scores'],
                     'elo_update': {'old': winner_elo, 'new': new_winner_elo}
                 }, room=winner_sid, namespace='/')
                 
                 socketio.emit('game_over', {
                     'winner': False,
-                    'message': 'Игра окончена. Вы проиграли.',
+                    'message': f'Игра окончена. Победил {winner_name} 😔',
                     'final_scores': game['scores'],
                     'elo_update': {'old': loser_elo, 'new': new_loser_elo}
                 }, room=loser_sid, namespace='/')
@@ -975,6 +1223,20 @@ def on_answer(data):
             'correct_answer': correct_translation,
             'you_answered': False
         }, room=opponent, namespace='/')
+
+        # Log Word Stats (Wrong)
+        with app.app_context():
+            db = get_db()
+            answering_email = game['emails'].get(request.sid)
+            if answering_email:
+                 db.execute('''
+                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, last_seen)
+                    VALUES (?, ?, 0, 1, CURRENT_TIMESTAMP)
+                    ON CONFLICT(user_email, word) DO UPDATE SET
+                    wrong_count = wrong_count + 1,
+                    last_seen = CURRENT_TIMESTAMP
+                ''', (answering_email, word))
+                 db.commit()
 
         # If both answered wrong
         if len(game['answered']) >= 2 and not game.get('round_over'):
