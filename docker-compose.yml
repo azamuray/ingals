@@ -1,8 +1,9 @@
 version: '3.8'
 
 services:
-  web:
-    build: .
+  backend:
+    build:
+      context: ./backend
     restart: unless-stopped
     expose:
       - "5000"
@@ -10,18 +11,31 @@ services:
       - .env
     environment:
       - FLASK_ENV=${FLASK_ENV}
-      - VIRTUAL_HOST=${VIRTUAL_HOST}
-      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
-      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
       - SSO_LOGIN_URL=${SSO_LOGIN_URL}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_ALGORITHM=${JWT_ALGORITHM}
-    # Ports for local testing
-    ports:
-      - "5002:5000"
+      - FORCE_HTTPS=${FORCE_HTTPS}
     networks:
-      - app-network
+      - default
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    ports:
+      - "5002:80"
+    depends_on:
+      - backend
+    environment:
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    networks:
+      - default
+      - web-proxy
 
 networks:
-  app-network:
-    driver: bridge
+  default:
+    name: ingals-network
+  web-proxy:
+    external: true

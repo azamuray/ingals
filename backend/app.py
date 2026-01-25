@@ -2,17 +2,17 @@ import json
 from typing import Dict, Optional
 import os
 import jwt
-from flask import Flask, render_template, request, redirect, session, url_for
+from flask import Flask, request, redirect, session, url_for, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 import random
 import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!' # Used for Flask session security
-socketio = SocketIO(app)
+socketio = SocketIO(app, cors_allowed_origins="*") # Allow CORS for devosh-style proxying
 
 # SSO Configuration
-SSO_LOGIN_URL = os.getenv('SSO_LOGIN_URL', 'https://chuvala.ru/login/google')
+SSO_LOGIN_URL = os.getenv('SSO_LOGIN_URL', 'http://localhost:8001/login')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'supersecretkeyformvpdev') # Shared with Chuvala
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 
@@ -63,10 +63,14 @@ def verify_token(token: str) -> Optional[dict]:
 
 # --- Routes ---
 
-@app.route('/')
-def index():
+# @app.route('/') -> Served by Nginx Frontend
+
+@app.route('/api/me')
+def api_me():
     user = get_current_user()
-    return render_template('index.html', user=user)
+    if user:
+        return jsonify(user)
+    return jsonify(None), 401
 
 @app.route('/login')
 def login():
@@ -95,12 +99,13 @@ def auth_callback():
         'email': payload.get('sub'),
         'token': token
     }
-    return redirect(url_for('index'))
+    # Redirect to root (frontend handled by Nginx)
+    return redirect('/')
 
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect(url_for('index'))
+    return redirect('/')
 
 
 # --- Socket.IO Events ---
@@ -108,11 +113,8 @@ def logout():
 @socketio.on('connect')
 def handle_connect():
     # Validate session on connection
-    # Note: Flask-SocketIO has access to the Flask session
     if not get_current_user():
         print(f'Unauthenticated client tried to connect: {request.sid}')
-        # We can optionally disconnect them immediately, or just let them be "guests" 
-        # but prevent game actions. For now, we allow connection but game logic checks auth.
         return 
 
     print(f'Client connected: {request.sid}, User: {session["user"]["email"]}')
