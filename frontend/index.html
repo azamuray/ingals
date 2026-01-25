@@ -152,7 +152,7 @@
           <span class="mr-2">🟢</span> Ожидающие игроки:
         </div>
 
-        <div id="players-list" class="space-y-3 mb-6 min-h-[120px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+        <div id="players-list" class="space-y-3 mb-6 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
           <p
             class="text-gray-500 text-sm italic text-center py-6 bg-gray-50 bg-opacity-50 rounded-xl border-2 border-dashed border-gray-200">
             Никого нет... Позовите друга! 🏃‍♂️
@@ -502,9 +502,15 @@
         gameArea.classList.remove('hidden');
         document.getElementById('leaderboard-container').classList.add('hidden'); // Hide leaderboard during game
 
+        // Ensure board is visible (if hidden by previous game_over)
+        wordDiv.classList.remove('hidden');
+        translationsDiv.classList.remove('hidden');
+        feedbackDiv.classList.remove('hidden');
+
         updateWordAndTranslations(data.word, data.translations);
         canAnswer = true;
         feedbackDiv.style.opacity = 0; // Hide but keep space
+
         gameOverDiv.classList.add('hidden');
         surrenderBtn.classList.remove('hidden');
         yourScoreSpan.textContent = '0';
@@ -522,16 +528,37 @@
       });
 
       socket.on('answer_result', (data) => {
-        canAnswer = false;
         yourScoreSpan.textContent = data.your_score;
         opponentScoreSpan.textContent = data.opponent_score;
-        correctAnswerGlobal = data.correct_answer;
+
+        // Only show correct answer if game is effectively over (I answered or opponent won)
+        // OR if needed for feedback.
 
         if (data.you_answered === false) {
-          feedbackDiv.innerHTML = `🏎️ Соперник опередил вас.<br>Ответ: <span class="text-3xl font-black block mt-1 text-indigo-700">${data.correct_answer}</span>`;
-          feedbackDiv.className = 'fade-message text-gray-700 font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border h-32 flex flex-col items-center justify-center';
-          feedbackDiv.style.opacity = 1;
+          // Opponent answered
+          if (data.correct) {
+            // Opponent WON the round
+            canAnswer = false;
+            correctAnswerGlobal = data.correct_answer;
+            feedbackDiv.innerHTML = `🏎️ Соперник ответил верно!<br>Ответ: <span class="text-3xl font-black block mt-1 text-indigo-700">${data.correct_answer}</span>`;
+            feedbackDiv.className = 'fade-message text-gray-700 font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border h-32 flex flex-col items-center justify-center';
+            feedbackDiv.style.opacity = 1;
+          } else {
+            // Opponent FAILED. I can still answer!
+            console.log("Opponent failed, keeping input unlocked.");
+            feedbackDiv.innerHTML = `❌ Соперник ошибся! Ваш ход!`;
+            feedbackDiv.className = 'fade-message text-red-600 font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border border-red-200 h-32 flex flex-col items-center justify-center';
+            feedbackDiv.style.opacity = 1;
+
+            // Hide message after short delay so it doesn't annoy
+            setTimeout(() => {
+              if (canAnswer) feedbackDiv.style.opacity = 0;
+            }, 2000);
+          }
         } else {
+          // I answered
+          canAnswer = false;
+          correctAnswerGlobal = data.correct_answer;
           showFeedback(data.correct, data.correct_answer);
           styleAnswerButtons(data.correct);
         }
@@ -539,8 +566,23 @@
 
       socket.on('game_over', (data) => {
         canAnswer = false;
-        const buttons = translationsDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = true);
+
+        // Hide game board to clear up UI
+        wordDiv.classList.add('hidden');
+        translationsDiv.classList.add('hidden');
+        feedbackDiv.classList.add('hidden');
+        surrenderBtn.classList.add('hidden');
+
+        // FORCE SCORE UPDATE from final_scores to ensure consistency
+        if (data.final_scores) {
+          for (const [sid, score] of Object.entries(data.final_scores)) {
+            if (sid === socket.id) {
+              yourScoreSpan.textContent = score;
+            } else {
+              opponentScoreSpan.textContent = score;
+            }
+          }
+        }
 
         let msg = data.message;
         if (data.elo_update) {
@@ -556,7 +598,6 @@
 
         gameResultMessage.innerHTML = msg; // Changed to innerHTML to support br/span
         gameOverDiv.classList.remove('hidden');
-        surrenderBtn.classList.add('hidden');
         loadLeaderboard(); // Refresh leaderboard after game ends
       });
 
