@@ -81,11 +81,17 @@ def init_db():
             )
         ''')
         
-        # Add/Update bots in database (INSERT OR REPLACE handles name/elo changes)
+        # Add/Update bots in database
+        # Strategy: Insert if new, Update name if exists (but PRESERVE ELO)
         for bot in BOTS:
-            cursor.execute('INSERT OR REPLACE INTO users (email, name, elo) VALUES (?, ?, ?)',
+            # 1. Try to insert new bot with default config
+            cursor.execute('INSERT OR IGNORE INTO users (email, name, elo) VALUES (?, ?, ?)',
                          (bot['email'], bot['name'], bot['elo']))
-            print(f"Added/Updated bot: {bot['name']} ({bot['elo']} ELO)")
+            
+            # 2. Update name in case it changed in config (but don't touch ELO)
+            cursor.execute('UPDATE users SET name = ? WHERE email = ?', (bot['name'], bot['email']))
+            
+            print(f"Added/Updated bot: {bot['name']}")
         
         db.commit()
 
