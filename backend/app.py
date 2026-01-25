@@ -15,6 +15,41 @@ socketio = SocketIO(app, cors_allowed_origins="*") # Allow CORS for devosh-style
 SSO_LOGIN_URL = os.getenv('SSO_LOGIN_URL', 'http://localhost:8001/login')
 JWT_SECRET_KEY = os.getenv('JWT_SECRET_KEY', 'supersecretkeyformvpdev') # Shared with Chuvala
 JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
+WINNING_SCORE = int(os.getenv('WINNING_SCORE', 15))
+
+# --- Database Setup ---
+import sqlite3
+from flask import g
+
+DATABASE = 'users.db'
+
+def get_db():
+    db = getattr(g, '_database', None)
+    if db is None:
+        db = g._database = sqlite3.connect(DATABASE)
+        db.row_factory = sqlite3.Row
+    return db
+
+@app.teardown_appcontext
+def close_connection(exception):
+    db = getattr(g, '_database', None)
+    if db is not None:
+        db.close()
+
+def init_db():
+    with app.app_context():
+        db = get_db()
+        cursor = db.cursor()
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                email TEXT PRIMARY KEY,
+                name TEXT,
+                elo INTEGER DEFAULT 1200
+            )
+        ''')
+        db.commit()
+
+init_db()  # Initialize on startup
 
 def get_words() -> Dict:
     with open("words.json", "r") as file:
@@ -69,11 +104,70 @@ def verify_token(token: str) -> Optional[dict]:
 def api_me():
     user = get_current_user()
     if user:
-        return jsonify(user)
+        # Fetch detailed profile from DB
+        db = get_db()
+        row = db.execute('SELECT name, elo FROM users WHERE email = ?', (user['email'],)).fetchone()
+        
+        user_data = {
+            'email': user['email'],
+            'name': row['name'] if row else None,
+            'elo': row['elo'] if row else 1200
+        }
+        
+        # If user not in DB, create them
+        if not row:
+            db.execute('INSERT INTO users (email, name, elo) VALUES (?, ?, ?)', (user['email'], None, 1200))
+            db.commit()
+            
+        return jsonify(user_data)
     return jsonify(None), 401
+
+@app.route('/api/profile', methods=['POST'])
+def update_profile():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+        
+    data = request.json
+    name = data.get('name')
+    
+    if not name or len(name) < 2:
+        return jsonify({'error': 'Invalid name'}), 400
+        
+    db = get_db()
+    db.execute('UPDATE users SET name = ? WHERE email = ?', (name, user['email']))
+    db.commit()
+    
+    return jsonify({'success': True})
+
+@app.route('/api/leaderboard')
+def get_leaderboard():
+    db = get_db()
+    top_players = db.execute('''
+        SELECT name, email, elo 
+        FROM users 
+        WHERE (elo != 1200 OR name IS NOT NULL)
+          AND email NOT LIKE 'Guest_%'
+        ORDER BY elo DESC 
+        LIMIT 20
+    ''').fetchall()
+    
+    result = []
+    for player in top_players:
+        result.append({
+            'name': player['name'] or player['email'],
+            'elo': player['elo']
+        })
+    return jsonify(result)
 
 @app.route('/login')
 def login():
+    # Check if currently logged in as Guest to merge data
+    current_user = get_current_user()
+    if current_user and current_user['email'].startswith('Guest_'):
+        session['merge_guest_email'] = current_user['email']
+        print(f"Stashing guest session for merge: {current_user['email']}")
+        
     # Redirect to SSO provider with return URL
     # We want Chuvala to redirect back to /auth/callback here
     callback_url = url_for('auth_callback', _external=True)
@@ -95,10 +189,42 @@ def auth_callback():
         return "Authentication failed: Invalid token", 401
     
     # Store user in session
+    new_email = payload.get('sub')
     session['user'] = {
-        'email': payload.get('sub'),
+        'email': new_email,
         'token': token
     }
+    
+    # --- MIGRATION LOGIC ---
+    merge_guest_email = session.pop('merge_guest_email', None)
+    if merge_guest_email:
+        print(f"Merging guest {merge_guest_email} into {new_email}")
+        db = get_db()
+        
+        # Get Guest Data
+        guest_row = db.execute('SELECT elo FROM users WHERE email = ?', (merge_guest_email,)).fetchone()
+        
+        if guest_row:
+            guest_elo = guest_row['elo']
+            
+            # Ensure new user exists
+            user_row = db.execute('SELECT elo FROM users WHERE email = ?', (new_email,)).fetchone()
+            if not user_row:
+                db.execute('INSERT INTO users (email, name, elo) VALUES (?, ?, ?)', (new_email, None, guest_elo))
+            else:
+                # If new user already has default ELO (1200) or we blindly prefer Guest progress (User choice implies intent to save)
+                # Let's take the MAX elo to be safe, or just overwrite if user_elo is 1200 (fresh).
+                # Strategy: Overwrite if current user is 'fresh' (1200 or no games). 
+                # For simplicity: Always overwrite with Guest ELO if Guest ELO != 1200.
+                if guest_elo != 1200:
+                     db.execute('UPDATE users SET elo = ? WHERE email = ?', (guest_elo, new_email))
+            
+            # Delete Guest account after successful migration
+            db.execute('DELETE FROM users WHERE email = ?', (merge_guest_email,))
+            print(f"Deleted guest account: {merge_guest_email}")
+            
+            db.commit()
+            
     # Redirect to root (frontend handled by Nginx)
     return redirect('/')
 
@@ -110,19 +236,57 @@ def logout():
 @app.route('/login/guest')
 def login_guest():
     guest_id = random.randint(1000, 9999)
+    email = f'Guest_{guest_id}'
     session['user'] = {
-        'email': f'Guest_{guest_id}',
+        'email': email,
         'token': 'guest'
     }
+    
+    # Ensure guest exists in DB
+    db = get_db()
+    # Check if exists
+    row = db.execute('SELECT 1 FROM users WHERE email = ?', (email,)).fetchone()
+    if not row:
+        db.execute('INSERT INTO users (email, name, elo) VALUES (?, ?, ?)', (email, f"Guest {guest_id}", 1200))
+        db.commit()
+        
     return redirect('/')
+
+# --- ELO Calculation Helper ---
+def calculate_elo(winner_elo, loser_elo, k_factor=32):
+    """
+    Calculate new ELO ratings using standard formula.
+    Ra' = Ra + K * (Sa - Ea)
+    """
+    expected_winner = 1 / (1 + 10 ** ((loser_elo - winner_elo) / 400))
+    expected_loser = 1 / (1 + 10 ** ((winner_elo - loser_elo) / 400))
+    
+    new_winner_elo = round(winner_elo + k_factor * (1 - expected_winner))
+    new_loser_elo = round(loser_elo + k_factor * (0 - expected_loser))
+    
+    return new_winner_elo, new_loser_elo
 
 # --- Helper: Broadcast Lobby State ---
 def broadcast_lobby_state():
-    """Send the current list of waiting players to everyone in the lobby."""
-    players_list = [{'sid': sid, 'email': info['email']} for sid, info in waiting_players.items()]
-    # Emit to all SIDs in the lobby
+    # Only active users
+    active_users = []
+    db = get_db()
+    
+    for sid, user in waiting_players.items():
+        # Fetch latest ELO and Name from DB
+        row = db.execute('SELECT name, elo FROM users WHERE email = ?', (user['email'],)).fetchone()
+        name = row['name'] if row and row['name'] else user['email']
+        elo = row['elo'] if row else 1200
+        
+        active_users.append({
+            'sid': sid, 
+            'email': user['email'], # Keep email for unique ID internally if needed
+            'name': name,
+            'elo': elo
+        })
+        
     for sid in waiting_players:
-        emit('lobby_update', players_list, room=sid)
+        emit('lobby_update', active_users, room=sid)
 
 @socketio.on('connect')
 def handle_connect(auth=None):
@@ -227,6 +391,10 @@ def handle_accept_challenge(data):
     player1 = challenger_sid
     player2 = target_sid
     
+    # Capture emails before removing
+    email1 = waiting_players[player1]['email']
+    email2 = waiting_players[player2]['email']
+    
     del waiting_players[player1]
     del waiting_players[player2]
     
@@ -242,12 +410,14 @@ def handle_accept_challenge(data):
 
     game_data = {
         'players': [player1, player2],
+        'emails': {player1: email1, player2: email2},
         'word': word,
         'translations': translations,
         'scores': {player1: 0, player2: 0},
         'answered': set(),
         'round_over': False
     }
+
     active_games[room_id] = game_data
 
     emit('game_start', {
@@ -264,7 +434,7 @@ def handle_accept_challenge(data):
 
 
 @socketio.on('answer')
-def handle_answer(data):
+def on_answer(data):
     room_id = None
     for r_id, game in active_games.items():
         if request.sid in game['players']:
@@ -294,25 +464,47 @@ def handle_answer(data):
         print(f"Player {request.sid} answered correctly. Score: {game['scores']}")
         
         # Check Win Condition
-        if game['scores'][request.sid] >= 15:
-            winner = request.sid
-            loser = game['players'][0] if game['players'][1] == request.sid else game['players'][1]
+        # Check Win Condition
+        if game['scores'][request.sid] >= WINNING_SCORE:
+            winner_sid = request.sid
+            loser_sid = game['players'][0] if game['players'][1] == request.sid else game['players'][1]
+            
+            # --- ELO UPDATE ---
+            db = get_db()
+            
+            winner_email = game['emails'].get(winner_sid)
+            loser_email = game['emails'].get(loser_sid)
+            
+            winner_row = db.execute('SELECT elo FROM users WHERE email = ?', (winner_email,)).fetchone()
+            loser_row = db.execute('SELECT elo FROM users WHERE email = ?', (loser_email,)).fetchone()
+            
+            winner_elo = winner_row['elo'] if winner_row else 1200
+            loser_elo = loser_row['elo'] if loser_row else 1200
+            
+            new_winner_elo, new_loser_elo = calculate_elo(winner_elo, loser_elo)
+            
+            # Update DB
+            db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_winner_elo, winner_email))
+            db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_loser_elo, loser_email))
+            db.commit()
             
             emit('game_over', {
                 'winner': True,
                 'message': 'Поздравляем! Вы победили!',
-                'final_scores': game['scores']
-            }, room=winner)
+                'final_scores': game['scores'],
+                'elo_update': {'old': winner_elo, 'new': new_winner_elo}
+            }, room=winner_sid)
             
             emit('game_over', {
                 'winner': False,
                 'message': 'Игра окончена. Вы проиграли.',
-                'final_scores': game['scores']
-            }, room=loser)
+                'final_scores': game['scores'],
+                'elo_update': {'old': loser_elo, 'new': new_loser_elo}
+            }, room=loser_sid)
             
             del active_games[room_id]
             return
-
+            
         game['round_over'] = True
         
         # Handle Round Win
@@ -395,7 +587,8 @@ def handle_surrender():
     emit('game_over', {
         'winner': True,
         'message': 'Соперник сдался! Вы победили!',
-        'final_scores': game['scores']
+        'final_scores': game['scores'],
+        'elo_update': None # Simpler to skip complex ELO logic on surrender for MVP or apply penalty later
     }, room=winner)
 
     emit('game_over', {
