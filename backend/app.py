@@ -108,6 +108,16 @@ def logout():
     return redirect('/')
 
 
+@app.route('/login/guest')
+def login_guest():
+    guest_id = random.randint(1000, 9999)
+    session['user'] = {
+        'email': f'Guest_{guest_id}',
+        'token': 'guest'
+    }
+    return redirect('/')
+
+
 # --- Socket.IO Events ---
 
 @socketio.on('connect')
