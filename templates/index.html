@@ -15,23 +15,24 @@
 <body class="bg-gray-100 min-h-screen flex items-center justify-center">
 
   <!-- Авторизация -->
+  {% if not user %}
   <div id="auth-area" class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
-    <h2 class="text-2xl font-bold mb-4 text-indigo-600">🔐 Вход / Регистрация</h2>
+    <h2 class="text-2xl font-bold mb-4 text-indigo-600">🔐 Добро пожаловать</h2>
+    <p class="mb-6 text-gray-600">Войдите через единый аккаунт Chuvala ID, чтобы начать соревнование.</p>
 
-    <input id="username" type="text" placeholder="Имя пользователя" class="border p-2 rounded w-full mb-3" />
-    <input id="password" type="password" placeholder="Пароль" class="border p-2 rounded w-full mb-3" />
-
-    <button id="auth-button" class="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700 w-full">🔓 Войти</button>
-
-    <p class="mt-4 text-sm text-gray-600">
-      <span id="toggle-mode" class="text-indigo-500 cursor-pointer hover:underline">Нет аккаунта? Зарегистрироваться</span>
-    </p>
-
-    <p id="auth-error" class="text-red-600 mt-2 hidden"></p>
+    <a href="/login" class="block bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 w-full font-semibold transition">
+      🚀 Войти через Chuvala SSO
+    </a>
   </div>
-
+  {% else %}
+  
   <!-- Игровая зона -->
-  <div id="game-container" class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center hidden">
+  <div id="game-container" class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
+    <div class="flex justify-between items-center mb-6">
+       <span class="text-sm text-gray-500">{{ user.email }}</span>
+       <a href="/logout" class="text-sm text-red-500 hover:underline">Wyiti</a>
+    </div>
+
     <h1 class="text-3xl font-bold mb-6 text-indigo-600">🧠 English Battle</h1>
 
     <button id="find-game" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
@@ -55,99 +56,23 @@
       </div>
 
       <div id="game-over" class="text-xl font-bold text-indigo-700 hidden">
-        <div class="mb-4"></div>
+        <div id="game-result-message" class="mb-4"></div>
         <button id="new-game-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
           🎮 Новая игра
         </button>
       </div>
     </div>
   </div>
+  {% endif %}
 
   <script>
-    // UI элементы
-    const authArea = document.getElementById('auth-area');
-    const gameContainer = document.getElementById('game-container');
-    const authButton = document.getElementById('auth-button');
-    const toggleMode = document.getElementById('toggle-mode');
-    const authError = document.getElementById('auth-error');
+    {% if user %}
+    // --- Игра и сокеты (только если авторизован) ---
+    
+    // Инициализация Socket.IO
+    // Flask сохраняет сессию в куки, SocketIO автоматически ее использует
+    const socket = io();
 
-    let mode = 'login';
-
-    // Переключение режима вход/регистрация
-    toggleMode.addEventListener('click', () => {
-      mode = mode === 'login' ? 'register' : 'login';
-      toggleMode.textContent = mode === 'login'
-        ? 'Нет аккаунта? Зарегистрироваться'
-        : 'Уже есть аккаунт? Войти';
-      authButton.textContent = mode === 'login' ? '🔓 Войти' : '📝 Зарегистрироваться';
-      authError.classList.add('hidden');
-      authError.textContent = '';
-    });
-
-    // Авторизация / регистрация
-    authButton.addEventListener('click', async () => {
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value;
-
-      if (!username || !password) {
-        authError.textContent = 'Введите имя и пароль.';
-        authError.classList.remove('hidden');
-        return;
-      }
-
-      try {
-        const res = await fetch(`/auth/${mode}`, {
-          method: 'POST',
-          headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({username, password})
-        });
-
-        if (!res.ok) {
-          const errData = await res.json();
-          authError.textContent = errData.message || 'Ошибка авторизации.';
-          authError.classList.remove('hidden');
-          return;
-        }
-
-        const data = await res.json();
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-          initGame();
-        } else {
-          authError.textContent = 'Ошибка: токен не получен.';
-          authError.classList.remove('hidden');
-        }
-      } catch (err) {
-        authError.textContent = 'Ошибка подключения к серверу.';
-        authError.classList.remove('hidden');
-      }
-    });
-
-    // Проверка токена при загрузке
-    function checkToken() {
-      return !!localStorage.getItem('token');
-    }
-
-    // Инициализация игры после авторизации
-    function initGame() {
-      authArea.classList.add('hidden');
-      gameContainer.classList.remove('hidden');
-      setupSocket();
-    }
-
-    // При загрузке страницы
-    window.onload = () => {
-      if (checkToken()) {
-        initGame();
-      } else {
-        authArea.classList.remove('hidden');
-        gameContainer.classList.add('hidden');
-      }
-    };
-
-    // --- Игра и сокеты ---
-
-    let socket;
     let canAnswer = true;
     let correctAnswerGlobal = null;
     const MAX_SCORE = 15;
@@ -159,115 +84,104 @@
     const opponentScoreSpan = document.getElementById('opponent-score');
     const feedbackDiv = document.getElementById('feedback');
     const gameOverDiv = document.getElementById('game-over');
+    const gameResultMessage = document.getElementById('game-result-message');
     const newGameBtn = document.getElementById('new-game-btn');
     const translationsDiv = document.getElementById('translations');
     const wordDiv = document.getElementById('word');
 
-    function setupSocket() {
-      // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
+    socket.on('connect', () => {
+      console.log('Подключено к сокету с id:', socket.id);
+    });
 
-      // Передаем токен как параметр при подключении
-      socket = io({ auth: { token } });
+    socket.on('connect_error', (err) => {
+      console.error('Ошибка подключения:', err.message);
+      // alert('Ошибка подключения к серверу: ' + err.message);
+    });
 
-      socket.on('connect', () => {
-        console.log('Подключено к сокету с id:', socket.id);
-      });
+    socket.on('error', (data) => {
+        alert(data.message);
+        window.location.href = '/'; // Reload to re-auth check
+    });
 
-      socket.on('connect_error', (err) => {
-        console.error('Ошибка подключения:', err.message);
-        alert('Ошибка подключения к серверу: ' + err.message);
-      });
+    findGameButton.onclick = () => {
+      findGameButton.disabled = true;
+      waitingDiv.classList.remove('hidden');
+      gameArea.classList.add('hidden');
+      gameOverDiv.classList.add('hidden');
+      feedbackDiv.classList.add('hidden');
+      yourScoreSpan.textContent = '0';
+      opponentScoreSpan.textContent = '0';
+      socket.emit('find_game');
+    };
 
-      findGameButton.onclick = () => {
-        findGameButton.disabled = true;
-        waitingDiv.classList.remove('hidden');
-        gameArea.classList.add('hidden');
-        gameOverDiv.classList.add('hidden');
-        feedbackDiv.classList.add('hidden');
-        yourScoreSpan.textContent = '0';
-        opponentScoreSpan.textContent = '0';
-        socket.emit('find_game');
-      };
+    // Когда игра найдена
+    socket.on('game_start', (data) => {
+      waitingDiv.classList.add('hidden');
+      findGameButton.disabled = false;
+      gameArea.classList.remove('hidden');
+      updateWordAndTranslations(data.word, data.translations);
+      canAnswer = true;
+      feedbackDiv.classList.add('hidden');
+      gameOverDiv.classList.add('hidden');
+      yourScoreSpan.textContent = '0';
+      opponentScoreSpan.textContent = '0';
+    });
 
-      // Когда игра найдена
-      socket.on('game_start', (data) => {
-        waitingDiv.classList.add('hidden');
-        findGameButton.disabled = false;
-        gameArea.classList.remove('hidden');
-        updateWordAndTranslations(data.word, data.translations);
-        canAnswer = true;
-        feedbackDiv.classList.add('hidden');
-        gameOverDiv.classList.add('hidden');
-        yourScoreSpan.textContent = '0';
-        opponentScoreSpan.textContent = '0';
-      });
+    // Новый раунд
+    socket.on('new_round', (data) => {
+      updateWordAndTranslations(data.word, data.translations);
+      canAnswer = true;
+      feedbackDiv.classList.add('hidden');
+      correctAnswerGlobal = null;
+    });
 
-      // Новый раунд
-      socket.on('new_round', (data) => {
-        updateWordAndTranslations(data.word, data.translations);
-        canAnswer = true;
-        feedbackDiv.classList.add('hidden');
-        correctAnswerGlobal = null;
-      });
+    // Результат ответа
+    socket.on('answer_result', (data) => {
+      canAnswer = false;
 
-      // Результат ответа
-      socket.on('answer_result', (data) => {
-        canAnswer = false;
+      yourScoreSpan.textContent = data.your_score;
+      opponentScoreSpan.textContent = data.opponent_score;
+      correctAnswerGlobal = data.correct_answer;
 
-        yourScoreSpan.textContent = data.your_score;
-        opponentScoreSpan.textContent = data.opponent_score;
-        correctAnswerGlobal = data.correct_answer;
+      if (data.you_answered === false) {
+        // Оппонент ответил правильно, мы не отвечали — показать нейтральное уведомление
+        feedbackDiv.textContent = `⏱️ Раунд завершен. Правильный ответ: ${data.correct_answer}`;
+        feedbackDiv.className = 'fade-message text-gray-700';
+        feedbackDiv.classList.remove('hidden');
+        feedbackDiv.style.opacity = 1;
+      } else {
+        showFeedback(data.correct, data.correct_answer);
+        styleAnswerButtons(data.correct);
+      }
+    });
 
-        if (data.you_answered === false) {
-          // Оппонент ответил правильно, мы не отвечали — показать нейтральное уведомление
-          feedbackDiv.textContent = `⏱️ Раунд завершен. Правильный ответ: ${data.correct_answer}`;
-          feedbackDiv.className = 'fade-message text-gray-700';
-          feedbackDiv.classList.remove('hidden');
-          feedbackDiv.style.opacity = 1;
-        } else {
-          showFeedback(data.correct, data.correct_answer);
-          styleAnswerButtons(data.correct);
-        }
-      });
+    // Завершение игры
+    socket.on('game_over', (data) => {
+      canAnswer = false;
+      const buttons = translationsDiv.querySelectorAll('button');
+      buttons.forEach(btn => btn.disabled = true);
+      
+      endGame(data.message);
+      
+      // Показываем финальные счета
+      yourScoreSpan.textContent = data.final_scores[socket.id] || 0;
+      
+      // Находим счет соперника
+      const opponentId = Object.keys(data.final_scores).find(id => id !== socket.id);
+      opponentScoreSpan.textContent = opponentId ? data.final_scores[opponentId] : 0;
+    });
 
-      // Завершение игры
-      socket.on('game_over', (data) => {
-        canAnswer = false;
-        const buttons = translationsDiv.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = true);
-        
-        if (data.winner) {
-          endGame('🎉 Поздравляем! Вы победили!');
-        } else {
-          endGame('😔 Игра окончена. Вы проиграли.');
-        }
-        
-        // Показываем финальные счета
-        yourScoreSpan.textContent = data.final_scores[socket.id] || 0;
-        
-        // Находим счет соперника
-        const opponentId = Object.keys(data.final_scores).find(id => id !== socket.id);
-        opponentScoreSpan.textContent = opponentId ? data.final_scores[opponentId] : 0;
-      });
+    socket.on('opponent_disconnected', () => {
+      alert('🚫 Соперник отключился. Возврат в главное меню.');
+      resetGame();
+    });
 
-      socket.on('game_error', (msg) => {
-        alert('Ошибка игры: ' + msg);
-        resetGame();
-      });
-
-      socket.on('opponent_disconnected', () => {
-        alert('🚫 Соперник отключился. Возврат в главное меню.');
-        resetGame();
-      });
-
-      // Обработчик кнопки "Новая игра"
-      newGameBtn.onclick = () => {
-        resetGame();
-        findGameButton.click();
-      };
-    }
-
+    // Обработчик кнопки "Новая игра"
+    newGameBtn.onclick = () => {
+      resetGame();
+      findGameButton.click();
+    };
+    
     function updateWordAndTranslations(word, translations) {
       wordDiv.textContent = `🔤 ${word}`;
       translationsDiv.innerHTML = '';
@@ -312,7 +226,7 @@
     }
 
     function endGame(message) {
-      gameOverDiv.textContent = `🎉 ${message}`;
+      gameResultMessage.textContent = message;
       gameOverDiv.classList.remove('hidden');
       const buttons = translationsDiv.querySelectorAll('button');
       buttons.forEach(btn => btn.disabled = true);
@@ -333,6 +247,7 @@
       translationsDiv.innerHTML = '';
       wordDiv.textContent = '';
     }
+    {% endif %}
   </script>
 </body>
 </html>

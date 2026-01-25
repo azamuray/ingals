@@ -6,44 +6,22 @@ services:
     restart: unless-stopped
     expose:
       - "5000"
+    env_file:
+      - .env
     environment:
-      - FLASK_ENV=production
-      - VIRTUAL_HOST=ingals.ru
-      - LETSENCRYPT_HOST=ingals.ru
-      - LETSENCRYPT_EMAIL=azamat.murdalov@gmail.com
-    # Keep ports for local development if needed, but in prod they might conflicts.
-    # We'll map them to localhost only to avoid public exposure if we use a gateway later.
+      - FLASK_ENV=${FLASK_ENV}
+      - VIRTUAL_HOST=${VIRTUAL_HOST}
+      - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
+      - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+      - SSO_LOGIN_URL=${SSO_LOGIN_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - JWT_ALGORITHM=${JWT_ALGORITHM}
+    # Ports for local testing
     ports:
-      - "127.0.0.1:5002:5000"
-    networks:
-      - app-network
-
-  auth:
-    build:
-      context: ./auth
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    expose:
-      - "5000"
-    environment:
-      - FLASK_ENV=production
-      - FLASK_APP=wsgi.py
-    volumes:
-      - ./auth/data:/app/data
-    depends_on:
-      - web
-    ports:
-      - "127.0.0.1:5001:5000"
+      - "5002:5000"
     networks:
       - app-network
 
 networks:
   app-network:
     driver: bridge
-
-# We might want to connect to an external proxy network later.
-# networks:
-#   default:
-#     name: ingals-network
-#   web-proxy:
-#     external: true
