@@ -82,6 +82,16 @@
 
     // Check Auth on Load
     async function checkAuth() {
+      // Check if token is present in URL (SSO redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const token = urlParams.get('token');
+
+      if (token) {
+        // Redirect to backend callback to set session
+        window.location.href = `/auth/callback?token=${token}`;
+        return;
+      }
+
       try {
         const res = await fetch('/api/me');
         if (res.ok) {
