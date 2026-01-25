@@ -20,8 +20,13 @@ WINNING_SCORE = int(os.getenv('WINNING_SCORE', 15))
 # --- Database Setup ---
 import sqlite3
 from flask import g
+import os
 
-DATABASE = 'users.db'
+# Ensure data directory exists
+DATA_DIR = os.path.join(os.path.dirname(__file__), 'data')
+os.makedirs(DATA_DIR, exist_ok=True)
+
+DATABASE = os.path.join(DATA_DIR, 'users.db')
 
 def get_db():
     db = getattr(g, '_database', None)

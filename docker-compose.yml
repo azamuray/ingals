@@ -18,6 +18,7 @@ services:
       - PYTHONUNBUFFERED=1
     volumes:
       - ./backend:/app
+      - db-data:/app/data # Persistent volume for database
     command: gunicorn --worker-class eventlet -w 1 --reload app:app --bind 0.0.0.0:5000
     networks:
       - default
@@ -46,3 +47,6 @@ networks:
     name: ingals-network
   web-proxy:
     external: true
+
+volumes:
+  db-data: # Named volume for persistent database storage
