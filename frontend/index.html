@@ -133,6 +133,21 @@
           </p>
         </div>
 
+        <!-- Round Selector -->
+        <div class="mb-6 bg-gradient-to-r from-purple-50 to-indigo-50 p-4 rounded-xl border border-indigo-200">
+          <label class="text-sm font-bold text-gray-700 mb-2 block flex items-center gap-2">
+            🎯 Количество раундов до победы:
+          </label>
+          <select id="rounds-selector"
+            class="w-full px-4 py-3 rounded-lg border-2 border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none transition-all font-bold text-center text-lg text-gray-700 bg-white cursor-pointer">
+            <option value="5">5 раундов ⚡</option>
+            <option value="10">10 раундов 🔥</option>
+            <option value="15" selected>15 раундов ⭐</option>
+            <option value="20">20 раундов 💪</option>
+            <option value="30">30 раундов 🏆</option>
+          </select>
+        </div>
+
         <div class="text-left mb-4 font-bold text-gray-700 text-lg flex items-center">
           <span class="mr-2">🟢</span> Ожидающие игроки:
         </div>
@@ -164,8 +179,12 @@
             <div class="text-5xl mb-2">⚔️</div>
             <h3 class="text-2xl font-extrabold text-gray-800">Вызов!</h3>
           </div>
-          <p class="text-gray-600 mb-8 text-center leading-relaxed">Игрок <span id="challenger-name"
+          <p class="text-gray-600 mb-6 text-center leading-relaxed">Игрок <span id="challenger-name"
               class="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded"></span> хочет сыграть с вами.</p>
+          <p class="text-center mb-8">
+            <span class="text-indigo-600 font-bold text-lg">До <span id="challenge-rounds" class="text-2xl">15</span>
+              побед</span>
+          </p>
           <div class="flex space-x-4">
             <button id="decline-btn"
               class="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl hover:bg-gray-200 transition font-bold text-sm tracking-wide">ОТКЛОНИТЬ</button>
@@ -192,6 +211,11 @@
           <div class="flex flex-col items-center">
             <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ты</span>
             <span id="your-score" class="text-3xl font-black text-indigo-600">0</span>
+          </div>
+          <div class="h-10 w-px bg-gray-300"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">До победы</span>
+            <span id="winning-score" class="text-2xl font-black text-gray-600">15</span>
           </div>
           <div class="h-10 w-px bg-gray-300"></div>
           <div class="flex flex-col items-center">
@@ -418,6 +442,7 @@
 
     // State for challenge
     let currentChallengerSid = null;
+    let currentChallengeRounds = 15;
 
     // Game Elements
     const yourScoreSpan = document.getElementById('your-score');
@@ -461,7 +486,9 @@
         if (data.target_sid === socket.id) {
           console.log('Challenge is for me!');
           currentChallengerSid = data.challenger_sid;
+          currentChallengeRounds = data.rounds || 15;
           challengerNameSpan.textContent = data.challenger_email;
+          document.getElementById('challenge-rounds').textContent = currentChallengeRounds;
           challengeModal.classList.remove('hidden');
         } else {
           console.log('Challenge ignored (for someone else):', data.target_sid);
@@ -482,6 +509,7 @@
         surrenderBtn.classList.remove('hidden');
         yourScoreSpan.textContent = '0';
         opponentScoreSpan.textContent = '0';
+        document.getElementById('winning-score').textContent = data.winning_score || 15;
       });
 
       // ... existing game events ...
@@ -549,7 +577,10 @@
     // Modal Handlers
     acceptBtn.onclick = () => {
       if (currentChallengerSid) {
-        socket.emit('accept_challenge', { challenger_sid: currentChallengerSid });
+        socket.emit('accept_challenge', {
+          challenger_sid: currentChallengerSid,
+          rounds: currentChallengeRounds
+        });
         acceptBtn.textContent = 'Запуск...';
         acceptBtn.disabled = true;
       }
@@ -597,8 +628,9 @@
         btn.textContent = '⚔️ Вызвать';
         btn.className = 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 tracking-wide uppercase';
         btn.onclick = () => {
-          console.log('Sending challenge to:', player.sid);
-          socket.emit('challenge_player', { target_sid: player.sid });
+          const selectedRounds = parseInt(document.getElementById('rounds-selector').value);
+          console.log('Sending challenge to:', player.sid, 'with rounds:', selectedRounds);
+          socket.emit('challenge_player', { target_sid: player.sid, rounds: selectedRounds });
           btn.textContent = '⏳ ...';
           btn.className = 'bg-gray-300 text-gray-500 px-4 py-2 rounded-lg text-xs font-bold shadow-none cursor-not-allowed';
           btn.disabled = true;

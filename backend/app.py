@@ -347,8 +347,13 @@ def handle_leave_lobby():
 def handle_challenge_player(data):
     target_sid = data.get('target_sid')
     challenger_sid = request.sid
+    rounds = data.get('rounds', WINNING_SCORE)  # Default from config
     
-    print(f"DEBUG: challenge_player called. Challenger: {challenger_sid}, Target: {target_sid}")
+    # Validate rounds (5-30)
+    if not isinstance(rounds, int) or rounds < 5 or rounds > 30:
+        rounds = WINNING_SCORE
+    
+    print(f"DEBUG: challenge_player called. Challenger: {challenger_sid}, Target: {target_sid}, Rounds: {rounds}")
     print(f"DEBUG: Current waiting_players keys: {list(waiting_players.keys())}")
     
     if not target_sid or target_sid not in waiting_players:
@@ -368,7 +373,8 @@ def handle_challenge_player(data):
         socketio.emit('challenge_received', {
             'target_sid': target_sid,
             'challenger_sid': challenger_sid,
-            'challenger_email': challenger_info['email']
+            'challenger_email': challenger_info['email'],
+            'rounds': rounds
         }) 
     else:
         print(f"DEBUG: FAILURE - Challenger {challenger_sid} not found in waiting_players")
@@ -386,6 +392,11 @@ def handle_decline_challenge(data):
 def handle_accept_challenge(data):
     target_sid = request.sid
     challenger_sid = data.get('challenger_sid')
+    rounds = data.get('rounds', WINNING_SCORE)  # Get rounds from challenge
+    
+    # Validate rounds again
+    if not isinstance(rounds, int) or rounds < 5 or rounds > 30:
+        rounds = WINNING_SCORE
 
     # Verify both are still in lobby
     if target_sid not in waiting_players or challenger_sid not in waiting_players:
@@ -420,7 +431,8 @@ def handle_accept_challenge(data):
         'translations': translations,
         'scores': {player1: 0, player2: 0},
         'answered': set(),
-        'round_over': False
+        'round_over': False,
+        'winning_score': rounds  # Store game-specific winning score
     }
 
     active_games[room_id] = game_data
@@ -428,13 +440,15 @@ def handle_accept_challenge(data):
     emit('game_start', {
         'word': word,
         'translations': translations,
-        'opponent_connected': True
+        'opponent_connected': True,
+        'winning_score': rounds  # Send to frontend
     }, room=player1)
 
     emit('game_start', {
         'word': word,
         'translations': translations,
-        'opponent_connected': True
+        'opponent_connected': True,
+        'winning_score': rounds  # Send to frontend
     }, room=player2)
 
 
@@ -469,8 +483,8 @@ def on_answer(data):
         print(f"Player {request.sid} answered correctly. Score: {game['scores']}")
         
         # Check Win Condition
-        # Check Win Condition
-        if game['scores'][request.sid] >= WINNING_SCORE:
+        # Check Win Condition - use game-specific winning score
+        if game['scores'][request.sid] >= game.get('winning_score', WINNING_SCORE):
             winner_sid = request.sid
             loser_sid = game['players'][0] if game['players'][1] == request.sid else game['players'][1]
             
