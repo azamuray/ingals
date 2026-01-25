@@ -1,6 +1,6 @@
 # Changelog
 
-Все значимые изменения в проекте English Battle будут документироваться в этом файле.
+Все значимые изменения в проекте Ingals будут документироваться в этом файле.
 
 Формат основан на [Keep a Changelog](https://keepachangelog.com/ru/1.0.0/),
 и проект следует [Semantic Versioning](https://semver.org/lang/ru/).
@@ -9,6 +9,37 @@
 
 ### Added
 - Файл CHANGELOG.md для документирования изменений
+
+## [2.0.0] - 2026-01-25
+
+### Added
+- **Chuvala SSO Integration**:
+  - Полная интеграция с единой системой авторизации Chuvala
+  - Реализован вход через `/login` с редиректом на SSO провайдер
+  - Валидация JWT токенов и создание сессий
+  
+- **Microservices Architecture**:
+  - Разделение на `backend` (Flask) и `frontend` (Nginx + Static)
+  - Клиентский рендеринг (CSR) вместо серверного (SSR)
+  - API endpoint `/api/me` для проверки статуса авторизации
+
+- **Environment Configuration**:
+  - Переход на `.env` файл для управления конфигурацией
+  - Поддержка `FORCE_HTTPS` для гибкости деплоя
+
+### Changed
+- **Реструктуризация проекта**:
+  - `app.py` перенесен в `backend/`
+  - `index.html` перенесен в `frontend/` и переписан на JS
+  - Обновлен `docker-compose.yml` для поддержки микросервисов
+- **Network**:
+  - Подключение к внешнему шлюзу (`web-proxy` network)
+  - Использование внутренней сети `ingals-network`
+
+### Removed
+- Удален старый локальный сервис `auth`
+- Удалены устаревшие скрипты деплоя и SSL (`deploy.sh`, `init-ssl.sh`, и др.)
+- Удалены старые конфиги Nginx
 
 ## [1.2.0] - 2025-08-16
 
