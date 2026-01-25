@@ -7,71 +7,225 @@
   <title>Ingals</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
   <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+
+  <!-- Font: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+    rel="stylesheet">
+
   <style>
+    body {
+      font-family: 'Outfit', sans-serif;
+    }
+
+    /* Animated Gradient Background */
+    .animated-bg {
+      background: linear-gradient(-45deg, #ee7752, #e73c7e, #23a6d5, #23d5ab);
+      background-size: 400% 400%;
+      animation: gradient 15s ease infinite;
+    }
+
+    @keyframes gradient {
+      0% {
+        background-position: 0% 50%;
+      }
+
+      50% {
+        background-position: 100% 50%;
+      }
+
+      100% {
+        background-position: 0% 50%;
+      }
+    }
+
+    /* Glassmorphism Card */
+    .glass-card {
+      background: rgba(255, 255, 255, 0.7);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+    }
+
     .fade-message {
       transition: opacity 0.5s ease;
+    }
+
+    /* Custom Scrollbar for list */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: rgba(0, 0, 0, 0.05);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 10px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.4);
     }
   </style>
 </head>
 
-<body class="bg-gray-100 min-h-screen flex items-center justify-center">
+<body class="animated-bg min-h-screen flex items-center justify-center p-4">
 
-  <div id="loading" class="text-xl text-gray-500">Загрузка...</div>
+  <div id="loading" class="text-xl text-white font-bold drop-shadow-md">Загрузка...</div>
 
-  <!-- Авторизация -->
-  <div id="auth-area" class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center hidden">
-    <h2 class="text-2xl font-bold mb-4 text-indigo-600">🔐 Добро пожаловать</h2>
-    <p class="mb-6 text-gray-600">Войдите через единый аккаунт Chuvala ID, чтобы начать соревнование.</p>
+  <div class="w-full max-w-lg flex flex-col items-center gap-6">
+    <!-- Global Header -->
+    <h1 class="text-5xl font-extrabold text-white drop-shadow-lg tracking-tight mb-2 flex items-center gap-3">
+      <span>🧠</span> Ingals
+    </h1>
 
-    <a href="/login"
-      class="block bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 w-full font-semibold transition">
-      🚀 Войти через Chuvala SSO
-    </a>
+    <!-- Авторизация -->
+    <div id="auth-area"
+      class="glass-card p-8 rounded-2xl w-full text-center hidden transform transition-all hover:scale-[1.01] duration-300">
+      <div class="mb-6">
+        <span class="text-6xl">🔐</span>
+      </div>
+      <h2 class="text-3xl font-bold mb-3 text-gray-800 tracking-tight">Добро пожаловать</h2>
+      <p class="mb-8 text-gray-600 leading-relaxed">Войдите через единый аккаунт <span
+          class="font-semibold text-indigo-600">Chuvala ID</span>, чтобы начать соревнование.</p>
 
-    <div class="mt-4">
-      <a href="/login/guest"
-        class="block w-full border border-gray-300 text-gray-700 font-semibold px-4 py-3 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition">
-        👻 Играть как Гость
+      <a href="/login"
+        class="block bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-4 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 font-bold text-lg mb-4">
+        🚀 Войти через SSO
       </a>
-    </div>
-  </div>
 
-  <!-- Игровая зона -->
-  <div id="game-container" class="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center hidden">
-    <div class="flex justify-between items-center mb-6">
-      <span id="user-email" class="text-sm text-gray-500"></span>
-      <a href="/logout" class="text-sm text-red-500 hover:underline">Выйти</a>
-    </div>
-
-    <h1 class="text-3xl font-bold mb-6 text-indigo-600">🧠 Ingals</h1>
-
-    <button id="find-game" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition">
-      🔍 Найти соперника
-    </button>
-
-    <div id="waiting" class="mt-4 text-gray-600 hidden">
-      ⏳ Ожидание соперника...
+      <div>
+        <a href="/login/guest"
+          class="block w-full border-2 border-dashed border-gray-300 text-gray-500 font-semibold px-6 py-3 rounded-xl hover:border-gray-400 hover:text-gray-700 hover:bg-gray-50 transition duration-300">
+          👻 Играть как Гость
+        </a>
+      </div>
     </div>
 
-    <div id="game-area" class="mt-6 hidden">
-      <div id="word" class="text-2xl font-semibold text-gray-800 mb-4"></div>
-
-      <div id="translations" class="grid grid-cols-2 gap-4 mb-4"></div>
-
-      <div id="feedback" class="fade-message text-lg font-medium mb-2 hidden"></div>
-
-      <div id="scores" class="text-lg text-gray-700 mb-2">
-        🧍‍♂️ Ты: <span id="your-score" class="font-bold">0</span> |
-        🧍‍♂️ Соперник: <span id="opponent-score" class="font-bold">0</span>
+    <!-- Игровая зона -->
+    <div id="game-container"
+      class="glass-card p-8 rounded-2xl w-full text-center hidden transform transition-all duration-500 relative">
+      <div class="flex justify-between items-center mb-6 border-b border-gray-200 border-opacity-30 pb-4">
+        <div class="flex items-center space-x-2">
+          <div
+            class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
+            👤
+          </div>
+          <span id="user-email" class="text-sm text-gray-700 font-semibold tracking-wide"></span>
+        </div>
+        <a href="/logout"
+          class="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full transition-colors">Выйти</a>
       </div>
 
-      <div id="game-over" class="text-xl font-bold text-indigo-700 hidden">
-        <div id="game-result-message" class="mb-4"></div>
-        <button id="new-game-btn" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition">
-          🎮 Новая игра
+
+
+      <!-- Lobby Section -->
+      <div id="lobby-area">
+        <div
+          class="bg-indigo-50 bg-opacity-60 border border-indigo-100 rounded-xl p-5 mb-8 backdrop-filter backdrop-blur-sm shadow-inner">
+          <p class="text-indigo-900 text-sm font-medium leading-relaxed">
+            👋 <span class="font-bold">Лобби.</span> Выберите соперника или ждите вызова.
+          </p>
+        </div>
+
+        <div class="text-left mb-4 font-bold text-gray-700 text-lg flex items-center">
+          <span class="mr-2">🟢</span> Ожидающие игроки:
+        </div>
+
+        <div id="players-list" class="space-y-3 mb-6 min-h-[120px] max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+          <p
+            class="text-gray-500 text-sm italic text-center py-6 bg-gray-50 bg-opacity-50 rounded-xl border-2 border-dashed border-gray-200">
+            Никого нет... Позовите друга! 🏃‍♂️
+          </p>
+        </div>
+      </div>
+
+      <!-- Challenge Modal -->
+      <div id="challenge-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 backdrop-filter backdrop-blur-sm transition-opacity duration-300">
+        <div
+          class="bg-white bg-opacity-90 p-8 rounded-2xl shadow-2xl max-w-sm w-full mx-4 border border-white border-opacity-40 transform scale-100 transition-transform duration-300">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">⚔️</div>
+            <h3 class="text-2xl font-extrabold text-gray-800">Вызов!</h3>
+          </div>
+          <p class="text-gray-600 mb-8 text-center leading-relaxed">Игрок <span id="challenger-name"
+              class="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded"></span> хочет сыграть с вами.</p>
+          <div class="flex space-x-4">
+            <button id="decline-btn"
+              class="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl hover:bg-gray-200 transition font-bold text-sm tracking-wide">ОТКЛОНИТЬ</button>
+            <button id="accept-btn"
+              class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl hover:shadow-lg transition font-extrabold text-sm tracking-wide shadow-md uppercase">ПРИНЯТЬ</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Active Game Section -->
+      <div id="game-area" class="mt-8 hidden">
+        <div id="word"
+          class="text-5xl font-black text-gray-800 mb-10 tracking-tight drop-shadow-sm transition-all duration-300 transform hover:scale-105 cursor-default select-none">
+        </div>
+
+        <div id="translations" class="grid grid-cols-2 gap-4 mb-8"></div>
+
+        <div id="feedback"
+          class="fade-message text-xl font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border h-32 flex items-center justify-center">
+        </div>
+
+        <div id="scores"
+          class="flex justify-between items-center bg-gray-50 bg-opacity-80 rounded-2xl p-5 mb-8 border border-gray-100 shadow-inner">
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Ты</span>
+            <span id="your-score" class="text-3xl font-black text-indigo-600">0</span>
+          </div>
+          <div class="h-10 w-px bg-gray-300"></div>
+          <div class="flex flex-col items-center">
+            <span class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">Соперник</span>
+            <span id="opponent-score" class="text-3xl font-black text-pink-600">0</span>
+          </div>
+        </div>
+
+        <button id="surrender-btn"
+          class="mt-4 w-full border border-red-200 text-red-500 font-medium py-3 rounded-xl hover:bg-red-50 hover:text-red-700 transition flex items-center justify-center space-x-2 group">
+          <span class="group-hover:scale-110 transition-transform">🏳️</span> <span>Сдаться</span>
         </button>
+
+        <div id="game-over"
+          class="text-xl font-bold text-indigo-700 hidden mt-6 p-6 bg-indigo-50 rounded-2xl border border-indigo-100 animate-pulse">
+          <div id="game-result-message" class="mb-6 text-2xl"></div>
+          <button id="back-to-lobby-btn"
+            class="bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all duration-300 font-bold text-lg">
+            🔙 В лобби
+          </button>
+        </div>
       </div>
-    </div>
+
+      <!-- Surrender Modal -->
+      <div id="surrender-modal"
+        class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 backdrop-filter backdrop-blur-sm transition-opacity duration-300">
+        <div
+          class="bg-white bg-opacity-90 p-8 rounded-2xl shadow-2xl max-w-sm w-full mx-4 border border-white border-opacity-40 transform scale-100 transition-transform duration-300">
+          <div class="text-center mb-6">
+            <div class="text-5xl mb-2">🏳️</div>
+            <h3 class="text-2xl font-extrabold text-gray-800">Сдаться?</h3>
+          </div>
+          <p class="text-gray-600 mb-8 text-center leading-relaxed">Вы действительно хотите завершить игру и засчитать
+            поражение?</p>
+          <div class="flex space-x-4">
+            <button id="cancel-surrender-btn"
+              class="flex-1 bg-gray-100 text-gray-600 py-3 rounded-xl hover:bg-gray-200 transition font-bold text-sm tracking-wide">НЕТ,
+              ИГРАЕМ</button>
+            <button id="confirm-surrender-btn"
+              class="flex-1 bg-red-600 text-white py-3 rounded-xl hover:bg-red-700 transition font-bold text-sm tracking-wide shadow-md">ДА,
+              СДАЮСЬ</button>
+          </div>
+        </div>
+      </div>
+    </div> <!-- Closing wrapper div -->
   </div>
 
   <script>
@@ -136,61 +290,105 @@
     let canAnswer = true;
     let correctAnswerGlobal = null;
 
-    const findGameButton = document.getElementById('find-game');
-    const waitingDiv = document.getElementById('waiting');
+    // Elements
+    const lobbyArea = document.getElementById('lobby-area');
+    const playersListDiv = document.getElementById('players-list');
     const gameArea = document.getElementById('game-area');
+
+    // Modal Elements
+    const challengeModal = document.getElementById('challenge-modal');
+    const challengerNameSpan = document.getElementById('challenger-name');
+    const acceptBtn = document.getElementById('accept-btn');
+    const declineBtn = document.getElementById('decline-btn');
+    const surrenderModal = document.getElementById('surrender-modal');
+    const cancelSurrenderBtn = document.getElementById('cancel-surrender-btn');
+    const confirmSurrenderBtn = document.getElementById('confirm-surrender-btn');
+
+    // State for challenge
+    let currentChallengerSid = null;
+
+    // Game Elements
     const yourScoreSpan = document.getElementById('your-score');
     const opponentScoreSpan = document.getElementById('opponent-score');
     const feedbackDiv = document.getElementById('feedback');
     const gameOverDiv = document.getElementById('game-over');
     const gameResultMessage = document.getElementById('game-result-message');
-    const newGameBtn = document.getElementById('new-game-btn');
+    const backToLobbyBtn = document.getElementById('back-to-lobby-btn');
+    const surrenderBtn = document.getElementById('surrender-btn');
     const translationsDiv = document.getElementById('translations');
     const wordDiv = document.getElementById('word');
 
     function setupSocket() {
       socket = io();
 
+      surrenderBtn.onclick = () => {
+        surrenderModal.classList.remove('hidden');
+      };
+
+      cancelSurrenderBtn.onclick = () => {
+        surrenderModal.classList.add('hidden');
+      };
+
+      confirmSurrenderBtn.onclick = () => {
+        socket.emit('surrender');
+        surrenderModal.classList.add('hidden');
+      };
+
       socket.on('connect', () => {
-        console.log('Подключено к сокету с id:', socket.id);
+        console.log('Подключено к сокету:', socket.id);
+        // Automatically enter lobby on connect
+        socket.emit('enter_lobby');
       });
 
-      socket.on('connect_error', (err) => {
-        console.error('Ошибка подключения:', err.message);
+      socket.on('lobby_update', (players) => {
+        renderLobby(players);
       });
 
-      // ... (rest of simple event handlers same as before)
+      socket.on('challenge_received', (data) => {
+        console.log('Challenge received event:', data);
+        if (data.target_sid === socket.id) {
+          console.log('Challenge is for me!');
+          currentChallengerSid = data.challenger_sid;
+          challengerNameSpan.textContent = data.challenger_email;
+          challengeModal.classList.remove('hidden');
+        } else {
+          console.log('Challenge ignored (for someone else):', data.target_sid);
+        }
+      });
 
       socket.on('game_start', (data) => {
-        waitingDiv.classList.add('hidden');
-        findGameButton.disabled = false;
+        // Hide lobby, show game
+        lobbyArea.classList.add('hidden');
+        challengeModal.classList.add('hidden'); // Ensure modal is closed
         gameArea.classList.remove('hidden');
+
         updateWordAndTranslations(data.word, data.translations);
         canAnswer = true;
-        feedbackDiv.classList.add('hidden');
+        feedbackDiv.style.opacity = 0; // Hide but keep space
         gameOverDiv.classList.add('hidden');
+        surrenderBtn.classList.remove('hidden');
         yourScoreSpan.textContent = '0';
         opponentScoreSpan.textContent = '0';
       });
 
+      // ... existing game events ...
+
       socket.on('new_round', (data) => {
         updateWordAndTranslations(data.word, data.translations);
         canAnswer = true;
-        feedbackDiv.classList.add('hidden');
+        feedbackDiv.style.opacity = 0;
         correctAnswerGlobal = null;
       });
 
       socket.on('answer_result', (data) => {
         canAnswer = false;
-
         yourScoreSpan.textContent = data.your_score;
         opponentScoreSpan.textContent = data.opponent_score;
         correctAnswerGlobal = data.correct_answer;
 
         if (data.you_answered === false) {
-          feedbackDiv.textContent = `⏱️ Раунд завершен. Правильный ответ: ${data.correct_answer}`;
-          feedbackDiv.className = 'fade-message text-gray-700';
-          feedbackDiv.classList.remove('hidden');
+          feedbackDiv.innerHTML = `🏎️ Соперник опередил вас.<br>Ответ: <span class="text-3xl font-black block mt-1 text-indigo-700">${data.correct_answer}</span>`;
+          feedbackDiv.className = 'fade-message text-gray-700 font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border h-32 flex flex-col items-center justify-center';
           feedbackDiv.style.opacity = 1;
         } else {
           showFeedback(data.correct, data.correct_answer);
@@ -203,41 +401,104 @@
         const buttons = translationsDiv.querySelectorAll('button');
         buttons.forEach(btn => btn.disabled = true);
         endGame(data.message);
-        yourScoreSpan.textContent = data.final_scores[socket.id] || 0;
-        const opponentId = Object.keys(data.final_scores).find(id => id !== socket.id);
-        opponentScoreSpan.textContent = opponentId ? data.final_scores[opponentId] : 0;
       });
 
       socket.on('opponent_disconnected', () => {
-        alert('🚫 Соперник отключился. Возврат в главное меню.');
-        resetGame();
+        alert('🚫 Соперник отключился. Возврат в лобби.');
+        resetToLobby();
+      });
+
+      socket.on('error', (data) => {
+        alert(data.message);
+      });
+
+      socket.on('debug_broadcast', (data) => {
+        console.log('DEBUG BROADCAST SOCKS WORKS:', data);
       });
     }
 
-    findGameButton.onclick = () => {
-      findGameButton.disabled = true;
-      waitingDiv.classList.remove('hidden');
-      gameArea.classList.add('hidden');
-      gameOverDiv.classList.add('hidden');
-      feedbackDiv.classList.add('hidden');
-      yourScoreSpan.textContent = '0';
-      opponentScoreSpan.textContent = '0';
-      socket.emit('find_game');
+    // Modal Handlers
+    acceptBtn.onclick = () => {
+      if (currentChallengerSid) {
+        socket.emit('accept_challenge', { challenger_sid: currentChallengerSid });
+        acceptBtn.textContent = 'Запуск...';
+        acceptBtn.disabled = true;
+      }
     };
 
-    newGameBtn.onclick = () => {
-      resetGame();
-      findGameButton.click();
+    declineBtn.onclick = () => {
+      if (currentChallengerSid) {
+        socket.emit('decline_challenge', { challenger_sid: currentChallengerSid });
+        challengeModal.classList.add('hidden');
+        currentChallengerSid = null;
+      }
     };
+
+    function renderLobby(players) {
+      playersListDiv.innerHTML = '';
+
+      // Filter out self
+      const others = players.filter(p => p.sid !== socket.id);
+
+      if (others.length === 0) {
+        playersListDiv.innerHTML = '<p class="text-gray-400 text-sm italic text-center py-4">Никого нет... Позовите друга!</p>';
+        return;
+      }
+
+      others.forEach(player => {
+        const div = document.createElement('div');
+        div.className = 'flex justify-between items-center bg-white bg-opacity-80 p-4 rounded-xl shadow-sm border border-gray-100 transform hover:scale-[1.02] transition-all duration-200';
+
+        const nameSpan = document.createElement('div');
+        nameSpan.className = 'flex flex-col text-left';
+
+        const emailText = document.createElement('span');
+        emailText.className = 'font-bold text-gray-800 text-sm';
+        emailText.textContent = player.email;
+
+        const statusText = document.createElement('span');
+        statusText.className = 'text-xs text-green-500 font-medium';
+        statusText.textContent = '● Онлайн';
+
+        nameSpan.appendChild(emailText);
+        nameSpan.appendChild(statusText);
+
+        const btn = document.createElement('button');
+        btn.textContent = '⚔️ Вызвать';
+        btn.className = 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-4 py-2 rounded-lg text-xs font-bold shadow hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 tracking-wide uppercase';
+        btn.onclick = () => {
+          console.log('Sending challenge to:', player.sid);
+          socket.emit('challenge_player', { target_sid: player.sid });
+          btn.textContent = '⏳ ...';
+          btn.className = 'bg-gray-300 text-gray-500 px-4 py-2 rounded-lg text-xs font-bold shadow-none cursor-not-allowed';
+          btn.disabled = true;
+        };
+
+        div.appendChild(nameSpan);
+        div.appendChild(btn);
+        playersListDiv.appendChild(div);
+      });
+    }
+
+    backToLobbyBtn.onclick = () => {
+      resetToLobby();
+    };
+
+    function resetToLobby() {
+      gameArea.classList.add('hidden');
+      lobbyArea.classList.remove('hidden');
+      gameOverDiv.classList.add('hidden');
+      feedbackDiv.style.opacity = 0;
+      socket.emit('enter_lobby');
+    }
 
     function updateWordAndTranslations(word, translations) {
       wordDiv.textContent = `🔤 ${word}`;
       translationsDiv.innerHTML = '';
-
       translations.forEach(tr => {
         const btn = document.createElement('button');
         btn.textContent = tr;
-        btn.className = 'bg-gray-200 hover:bg-gray-300 py-2 px-4 rounded-lg transition font-medium';
+        btn.className = 'bg-white border-2 border-gray-100 hover:border-indigo-300 hover:bg-indigo-50 py-4 px-6 rounded-xl transition-all duration-200 font-bold text-gray-700 text-lg shadow-sm hover:shadow-md transform hover:-translate-y-0.5 active:scale-95';
         btn.onclick = () => {
           if (canAnswer) {
             socket.emit('answer', { answer: tr });
@@ -246,6 +507,8 @@
         translationsDiv.appendChild(btn);
       });
     }
+
+    // ... existing styleAnswerButtons, showFeedback, endGame ...
 
     function styleAnswerButtons(correct) {
       const buttons = translationsDiv.querySelectorAll('button');
@@ -264,8 +527,11 @@
       feedbackDiv.textContent = correct
         ? `✅ Верно! Ответ: ${answer}`
         : `❌ Неверно! Правильный ответ: ${answer}`;
-      feedbackDiv.className = `fade-message ${correct ? 'text-green-600' : 'text-red-600'}`;
-      feedbackDiv.classList.remove('hidden');
+
+      const baseClasses = 'fade-message text-xl font-bold mb-6 opacity-0 p-4 rounded-xl bg-opacity-90 shadow-sm border h-32 flex flex-col items-center justify-center';
+      feedbackDiv.className = `${baseClasses} ${correct ? 'bg-green-100 text-green-800 border border-green-200' : 'bg-red-100 text-red-800 border border-red-200'}`;
+
+      // Show
       feedbackDiv.style.opacity = 1;
 
       setTimeout(() => {
@@ -276,22 +542,10 @@
     function endGame(message) {
       gameResultMessage.textContent = message;
       gameOverDiv.classList.remove('hidden');
+      surrenderBtn.classList.add('hidden');
       const buttons = translationsDiv.querySelectorAll('button');
       buttons.forEach(btn => btn.disabled = true);
       canAnswer = false;
-    }
-
-    function resetGame() {
-      gameArea.classList.add('hidden');
-      waitingDiv.classList.add('hidden');
-      findGameButton.disabled = false;
-      yourScoreSpan.textContent = '0';
-      opponentScoreSpan.textContent = '0';
-      feedbackDiv.classList.add('hidden');
-      gameOverDiv.classList.add('hidden');
-      canAnswer = true;
-      translationsDiv.innerHTML = '';
-      wordDiv.textContent = '';
     }
   </script>
 </body>

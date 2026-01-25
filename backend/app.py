@@ -38,8 +38,8 @@ def generate_translations(word: str, num_options: int = 6) -> list[str]:
     random.shuffle(options)
     return options
 
-# Очередь ожидающих игроков
-waiting_players = []
+# Очередь ожидающих игроков (Lobby): sid -> {email: ...}
+waiting_players = {}
 # Активные игры: room_id -> {'players': [player1, player2], 'word': word, ...}
 active_games = {}
 
@@ -107,7 +107,6 @@ def logout():
     session.pop('user', None)
     return redirect('/')
 
-
 @app.route('/login/guest')
 def login_guest():
     guest_id = random.randint(1000, 9999)
@@ -117,24 +116,34 @@ def login_guest():
     }
     return redirect('/')
 
-
-# --- Socket.IO Events ---
+# --- Helper: Broadcast Lobby State ---
+def broadcast_lobby_state():
+    """Send the current list of waiting players to everyone in the lobby."""
+    players_list = [{'sid': sid, 'email': info['email']} for sid, info in waiting_players.items()]
+    # Emit to all SIDs in the lobby
+    for sid in waiting_players:
+        emit('lobby_update', players_list, room=sid)
 
 @socketio.on('connect')
-def handle_connect():
+def handle_connect(auth=None):
     # Validate session on connection
     if not get_current_user():
         print(f'Unauthenticated client tried to connect: {request.sid}')
         return 
 
     print(f'Client connected: {request.sid}, User: {session["user"]["email"]}')
+    join_room(request.sid) # Explicitly join room with own SID
+    
+    # Broadcast debug to see if sockets work at all
+    socketio.emit('debug_broadcast', {'msg': f'User {request.sid} connected'})
 
 
 @socketio.on('disconnect')
 def handle_disconnect():
     print(f'Client disconnected: {request.sid}')
     if request.sid in waiting_players:
-        waiting_players.remove(request.sid)
+        del waiting_players[request.sid]
+        broadcast_lobby_state()
     else:
         for room_id, game in active_games.items():
             if request.sid in game['players']:
@@ -144,50 +153,114 @@ def handle_disconnect():
                 del active_games[room_id]
                 break
 
-@socketio.on('find_game')
-def handle_find_game():
-    if not get_current_user():
+@socketio.on('enter_lobby')
+def handle_enter_lobby():
+    user = get_current_user()
+    if not user:
         emit('error', {'message': 'Authentication required'})
         return
 
+    # Add to waiting list if not already there
+    if request.sid not in waiting_players:
+        waiting_players[request.sid] = {'email': user['email']}
+        print(f'Player {request.sid} ({user["email"]}) entered lobby')
+    
+    # Send update to everyone (including self)
+    broadcast_lobby_state()
+
+@socketio.on('leave_lobby')
+def handle_leave_lobby():
     if request.sid in waiting_players:
+        del waiting_players[request.sid]
+        broadcast_lobby_state()
+
+@socketio.on('challenge_player')
+def handle_challenge_player(data):
+    target_sid = data.get('target_sid')
+    challenger_sid = request.sid
+    
+    print(f"DEBUG: challenge_player called. Challenger: {challenger_sid}, Target: {target_sid}")
+    print(f"DEBUG: Current waiting_players keys: {list(waiting_players.keys())}")
+    
+    if not target_sid or target_sid not in waiting_players:
+        print(f"DEBUG: FAILURE - Target {target_sid} not found")
+        emit('error', {'message': 'Player not found or no longer available'})
         return
 
-    waiting_players.append(request.sid)
-    print(f'Player {request.sid} ({session["user"]["email"]}) is waiting for a game')
+    if target_sid == challenger_sid:
+        print("DEBUG: FAILURE - Self challenge")
+        return
 
-    if len(waiting_players) >= 2:
-        player1 = waiting_players.pop(0)
-        player2 = waiting_players.pop(0)
+    # Notify target player about the challenge
+    challenger_info = waiting_players.get(challenger_sid)
+    if challenger_info:
+        print(f"DEBUG: SUCCESS - Broadcasting challenge_received to ALL (targeting {target_sid})")
+        # WORKAROUND: Broadcast to all, client checks target_sid
+        socketio.emit('challenge_received', {
+            'target_sid': target_sid,
+            'challenger_sid': challenger_sid,
+            'challenger_email': challenger_info['email']
+        }) 
+    else:
+        print(f"DEBUG: FAILURE - Challenger {challenger_sid} not found in waiting_players")
+        emit('error', {'message': 'You are not in the lobby. Please refresh.'})
 
-        room_id = f"room_{player1}_{player2}"
-        join_room(room_id, player1)
-        join_room(room_id, player2)
 
-        word, translation = random.choice(list(WORDS.items()))
-        translations = generate_translations(word, num_options=6)
+@socketio.on('decline_challenge')
+def handle_decline_challenge(data):
+    challenger_sid = data.get('challenger_sid')
+    # Notify challenger
+    emit('challenge_declined', {'message': 'Challenge declined'}, room=challenger_sid)
 
-        game_data = {
-            'players': [player1, player2],
-            'word': word,
-            'translations': translations,
-            'scores': {player1: 0, player2: 0},
-            'answered': set(),
-            'round_over': False
-        }
-        active_games[room_id] = game_data
 
-        emit('game_start', {
-            'word': word,
-            'translations': translations,
-            'opponent_connected': True
-        }, room=player1)
+@socketio.on('accept_challenge')
+def handle_accept_challenge(data):
+    target_sid = request.sid
+    challenger_sid = data.get('challenger_sid')
 
-        emit('game_start', {
-            'word': word,
-            'translations': translations,
-            'opponent_connected': True
-        }, room=player2)
+    # Verify both are still in lobby
+    if target_sid not in waiting_players or challenger_sid not in waiting_players:
+        emit('error', {'message': 'Cannot start game. One of the players left.'})
+        return
+
+    # Remove both from lobby
+    player1 = challenger_sid
+    player2 = target_sid
+    
+    del waiting_players[player1]
+    del waiting_players[player2]
+    
+    broadcast_lobby_state()
+
+    # Start Game
+    room_id = f"room_{player1}_{player2}"
+    join_room(room_id, player1)
+    join_room(room_id, player2)
+
+    word, translation = random.choice(list(WORDS.items()))
+    translations = generate_translations(word, num_options=6)
+
+    game_data = {
+        'players': [player1, player2],
+        'word': word,
+        'translations': translations,
+        'scores': {player1: 0, player2: 0},
+        'answered': set(),
+        'round_over': False
+    }
+    active_games[room_id] = game_data
+
+    emit('game_start', {
+        'word': word,
+        'translations': translations,
+        'opponent_connected': True
+    }, room=player1)
+
+    emit('game_start', {
+        'word': word,
+        'translations': translations,
+        'opponent_connected': True
+    }, room=player2)
 
 
 @socketio.on('answer')
@@ -301,6 +374,37 @@ def handle_answer(data):
                 'word': word,
                 'translations': translations
             }, room=room_id)
+
+
+@socketio.on('surrender')
+def handle_surrender():
+    # Find game
+    room_id = None
+    for r_id, game in active_games.items():
+        if request.sid in game['players']:
+            room_id = r_id
+            break
+
+    if not room_id:
+        return
+
+    game = active_games[room_id]
+    loser = request.sid
+    winner = game['players'][0] if game['players'][1] == loser else game['players'][1]
+
+    emit('game_over', {
+        'winner': True,
+        'message': 'Соперник сдался! Вы победили!',
+        'final_scores': game['scores']
+    }, room=winner)
+
+    emit('game_over', {
+        'winner': False,
+        'message': 'Вы сдались.',
+        'final_scores': game['scores']
+    }, room=loser)
+
+    del active_games[room_id]
 
 
 if __name__ == '__main__':

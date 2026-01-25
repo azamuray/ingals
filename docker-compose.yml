@@ -15,6 +15,10 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - JWT_ALGORITHM=${JWT_ALGORITHM}
       - FORCE_HTTPS=${FORCE_HTTPS}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./backend:/app
+    command: gunicorn --worker-class eventlet -w 1 --reload app:app --bind 0.0.0.0:5000
     networks:
       - default
 
@@ -30,6 +34,9 @@ services:
       - VIRTUAL_HOST=${VIRTUAL_HOST}
       - LETSENCRYPT_HOST=${LETSENCRYPT_HOST}
       - LETSENCRYPT_EMAIL=${LETSENCRYPT_EMAIL}
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf
     networks:
       - default
       - web-proxy
