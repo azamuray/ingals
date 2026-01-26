@@ -326,7 +326,7 @@ def get_my_stats():
     db = get_db()
     
     # Words
-    words_rows = db.execute('SELECT word, correct_count, wrong_count, last_seen FROM user_words WHERE user_email = ? ORDER BY last_seen DESC', (user['email'],)).fetchall()
+    words_rows = db.execute('SELECT word, correct_count, wrong_count, status, last_seen FROM user_words WHERE user_email = ? ORDER BY last_seen DESC', (user['email'],)).fetchall()
     words = [dict(row) for row in words_rows]
     
     # History (Last 20 games)
@@ -378,6 +378,40 @@ def update_profile():
     db.commit()
     
     return jsonify({'success': True})
+
+@app.route('/api/me/words/toggle', methods=['POST'])
+def toggle_word_status():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Unauthorized'}), 401
+    
+    data = request.json
+    word = data.get('word')
+    
+    if not word:
+        return jsonify({'error': 'Missing word'}), 400
+        
+    db = get_db()
+    # Check current status
+    row = db.execute('SELECT status FROM user_words WHERE user_email = ? AND word = ?', (user['email'], word)).fetchone()
+    
+    new_status = 'learned'
+    if row:
+        current_status = row['status']
+        new_status = 'learning' if current_status == 'learned' else 'learned'
+        
+        db.execute('UPDATE user_words SET status = ? WHERE user_email = ? AND word = ?', (new_status, user['email'], word))
+    else:
+        # If word doesn't exist yet, insert as learned (since they clicked to toggle it presumably from somewhere, or maybe default to learning?)
+        # Actually user can only click words they have seen. If not seen, maybe insert as learning.
+        # But for now assume existing words. If not exists, insert as Learned.
+        db.execute('''
+            INSERT INTO user_words (user_email, word, correct_count, wrong_count, status, last_seen)
+            VALUES (?, ?, 0, 0, ?, CURRENT_TIMESTAMP)
+        ''', (user['email'], word, new_status))
+        
+    db.commit()
+    return jsonify({'status': new_status})
 
 @app.route('/api/leaderboard')
 def get_leaderboard():
@@ -521,13 +555,18 @@ def broadcast_lobby_state():
             'sid': sid, 
             'email': user['email'], # Keep email for unique ID internally if needed
             'name': name,
-            'elo': elo
+            'elo': elo,
+            'is_bot': sid.startswith('bot_') or user['email'] in bot_emails
         })
         
-    for sid in waiting_players:
-        # Only send to real players (not bot SIDs)
-        if not sid.startswith('bot_'):
-            socketio.emit('lobby_update', active_users, room=sid, namespace='/')
+    online_count = len(waiting_players)
+    
+    # Sort active_users for optimization if needed, but client handles it too.
+    
+    socketio.emit('lobby_update', {
+        'players': active_users,
+        'online_count': online_count
+    }, namespace='/')
 
 @socketio.on('connect')
 def handle_connect(auth=None):
@@ -1112,10 +1151,11 @@ def on_answer(data):
             answering_email = game['emails'].get(request.sid)
             if answering_email:
                  db.execute('''
-                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, last_seen)
-                    VALUES (?, ?, 1, 0, CURRENT_TIMESTAMP)
+                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, status, last_seen)
+                    VALUES (?, ?, 1, 0, 'learned', CURRENT_TIMESTAMP)
                     ON CONFLICT(user_email, word) DO UPDATE SET
                     correct_count = correct_count + 1,
+                    status = CASE WHEN (correct_count + 1) > (wrong_count * 2) THEN 'learned' ELSE status END, -- Auto-promote if doing well
                     last_seen = CURRENT_TIMESTAMP
                 ''', (answering_email, word))
                  db.commit()
@@ -1230,10 +1270,11 @@ def on_answer(data):
             answering_email = game['emails'].get(request.sid)
             if answering_email:
                  db.execute('''
-                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, last_seen)
-                    VALUES (?, ?, 0, 1, CURRENT_TIMESTAMP)
+                    INSERT INTO user_words (user_email, word, correct_count, wrong_count, status, last_seen)
+                    VALUES (?, ?, 0, 1, 'learning', CURRENT_TIMESTAMP)
                     ON CONFLICT(user_email, word) DO UPDATE SET
                     wrong_count = wrong_count + 1,
+                    status = 'learning',
                     last_seen = CURRENT_TIMESTAMP
                 ''', (answering_email, word))
                  db.commit()
