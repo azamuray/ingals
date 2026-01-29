@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ingals Admin Panel</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font: Outfit -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-gray-100 min-h-screen p-6">
+
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="flex justify-between items-center mb-8">
+            <h1 class="text-3xl font-black text-gray-800 flex items-center gap-3">
+                <svg class="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z">
+                    </path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Ingals Admin
+            </h1>
+            <a href="/"
+                class="px-4 py-2 bg-white text-indigo-600 font-bold rounded-lg shadow hover:bg-indigo-50 transition flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                </svg>
+                На сайт</a>
+        </div>
+
+        <!-- Stats / Actions -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-gray-500 font-bold text-sm uppercase tracking-wide">Всего пользователей</h3>
+                <p class="text-4xl font-black text-gray-800 mt-2" id="total-users">-</p>
+            </div>
+            <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                <h3 class="text-gray-500 font-bold text-sm uppercase tracking-wide">Активных игр</h3>
+                <p class="text-4xl font-black text-gray-800 mt-2" id="active-games">-</p>
+            </div>
+        </div>
+
+        <!-- TABS Navigation -->
+        <div class="flex gap-4 mb-6 border-b border-gray-200">
+            <button onclick="switchTab('users')" id="tab-btn-users"
+                class="pb-2 border-b-4 border-indigo-600 font-bold text-indigo-600 transition">Пользователи</button>
+            <button onclick="switchTab('games')" id="tab-btn-games"
+                class="pb-2 border-b-4 border-transparent text-gray-500 hover:text-gray-700 font-bold transition">Игры</button>
+            <button onclick="switchTab('analytics')" id="tab-btn-analytics"
+                class="pb-2 border-b-4 border-transparent text-gray-500 hover:text-gray-700 font-bold transition">Аналитика</button>
+        </div>
+
+        <!-- 1. USERS TAB -->
+        <div id="tab-content-users" class="tab-content">
+
+            <!-- Users Table -->
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h2 class="text-xl font-bold text-gray-700">Пользователи</h2>
+                    <button onclick="loadUsers()"
+                        class="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1">
+                        Обновить
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3 font-bold border-b">Email</th>
+                                <th class="px-6 py-3 font-bold border-b">Имя</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">ELO</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Игр</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Роль</th>
+                                <th class="px-6 py-3 font-bold border-b text-right">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody id="users-table-body" class="text-sm">
+                            <tr>
+                                <td colspan="6" class="p-8 text-center text-gray-400">Загрузка...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div> <!-- End Users Tab -->
+
+        <!-- 2. GAMES TAB -->
+        <div id="tab-content-games" class="tab-content hidden h-full">
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col h-[70vh]">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
+                    <h2 class="text-xl font-bold text-gray-700">Последние игры (Все)</h2>
+                    <button onclick="loadGames()"
+                        class="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1">
+                        Обновить
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="overflow-auto flex-1">
+                    <table class="w-full text-left border-collapse relative">
+                        <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3 font-bold border-b">ID</th>
+                                <th class="px-6 py-3 font-bold border-b">Игрок 1</th>
+                                <th class="px-6 py-3 font-bold border-b">Игрок 2</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Счет</th>
+                                <th class="px-6 py-3 font-bold border-b">Победитель</th>
+                                <th class="px-6 py-3 font-bold border-b text-right">Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody id="games-table-body" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. ANALYTICS TAB -->
+        <div id="tab-content-analytics" class="tab-content hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Visits Card -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Посещения за сегодня</h3>
+                    <div class="flex items-end gap-2 text-5xl font-black text-indigo-600">
+                        <span id="stat-visits-today">-</span>
+                        <span class="text-sm text-gray-400 font-medium mb-1">чел.</span>
+                    </div>
+                </div>
+
+                <!-- Games Card -->
+                <div class="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
+                    <h3 class="text-lg font-bold text-gray-800 mb-4">Всего игр сыграно</h3>
+                    <div class="flex items-end gap-2 text-5xl font-black text-green-600">
+                        <span id="stat-total-games">-</span>
+                        <span class="text-sm text-gray-400 font-medium mb-1">матчей</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sessions Table -->
+            <div
+                class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden mt-6 flex flex-col h-[60vh]">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
+                    <h2 class="text-xl font-bold text-gray-700">История Посещений</h2>
+                    <button onclick="loadStats()"
+                        class="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1">
+                        Обновить
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="overflow-auto flex-1">
+                    <table class="w-full text-left border-collapse relative">
+                        <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                            <tr class="text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3 font-bold border-b">Email</th>
+                                <th class="px-6 py-3 font-bold border-b">Начало</th>
+                                <th class="px-6 py-3 font-bold border-b">Последняя активн.</th>
+                                <th class="px-6 py-3 font-bold border-b">Длительность</th>
+                                <th class="px-6 py-3 font-bold border-b text-right">IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="sessions-table-body" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- === MODALS === -->
+
+    <!-- Edit User Modal -->
+    <div id="modal-edit-user"
+        class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 transform transition-all scale-100">
+            <h2 class="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <svg class="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z">
+                    </path>
+                </svg>
+                Редактирование
+            </h2>
+            <div class="mb-4">
+                <label class="block text-gray-500 text-sm font-bold mb-2">Email (ID)</label>
+                <input type="text" id="edit-email" disabled
+                    class="w-full bg-gray-100 text-gray-500 rounded-lg p-3 border border-gray-200">
+            </div>
+            <div class="mb-4">
+                <label class="block text-gray-700 text-sm font-bold mb-2">Имя</label>
+                <input type="text" id="edit-name" placeholder="Введите имя"
+                    class="w-full bg-white text-gray-900 rounded-lg p-3 border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="mb-6">
+                <label class="block text-gray-700 text-sm font-bold mb-2">ELO</label>
+                <input type="number" id="edit-elo"
+                    class="w-full bg-white text-gray-900 rounded-lg p-3 border border-gray-300 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeEditModal()"
+                    class="px-4 py-2 text-gray-500 font-bold hover:bg-gray-100 rounded-lg transition">Отмена</button>
+                <button onclick="saveEditUser()" id="save-edit-btn"
+                    class="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition shadow-lg">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="modal-delete-user"
+        class="fixed inset-0 bg-black bg-opacity-60 hidden flex items-center justify-center z-50 p-4 backdrop-blur-sm">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 text-center transform transition-all scale-100">
+            <div class="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                    </path>
+                </svg>
+            </div>
+            <h2 class="text-xl font-bold text-gray-800 mb-2">Удалить пользователя?</h2>
+            <p class="text-gray-500 text-sm mb-6">Вы собираетесь удалить <span id="delete-target-email"
+                    class="font-bold text-gray-800"></span>. Это действие <span
+                    class="text-red-500 font-bold">необратимо</span>.</p>
+            <div class="flex justify-center gap-3">
+                <button onclick="closeDeleteModal()"
+                    class="px-4 py-2 bg-gray-100 text-gray-600 font-bold rounded-xl hover:bg-gray-200 transition">Отмена</button>
+                <button onclick="confirmDeleteUser()" id="confirm-delete-btn"
+                    class="px-6 py-2 bg-red-600 text-white font-bold rounded-xl hover:bg-red-700 transition shadow-lg">Удалить</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        // Check Auth immediately
+        async function checkAdminAccess() {
+            try {
+                const res = await fetch('/api/admin/users');
+                if (res.status === 401 || res.status === 403) {
+                    alert("Доступ запрещен. Только администраторы.");
+                    window.location.href = '/';
+                    return;
+                }
+                const users = await res.json();
+                renderUsers(users);
+            } catch (e) {
+                console.error(e);
+                alert("Ошибка соединения с сервером.");
+            }
+        }
+
+        // --- MODAL STATE ---
+        let userToDelete = null;
+
+        // --- DELETE LOGIC ---
+        function banUser(email) {
+            userToDelete = email;
+            document.getElementById('delete-target-email').textContent = email;
+            document.getElementById('modal-delete-user').classList.remove('hidden');
+        }
+
+        function closeDeleteModal() {
+            userToDelete = null;
+            document.getElementById('modal-delete-user').classList.add('hidden');
+        }
+
+        async function confirmDeleteUser() {
+            if(!userToDelete) return;
+            
+            const btn = document.getElementById('confirm-delete-btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Удаление...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/admin/users/ban', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: userToDelete })
+                });
+
+                if (res.ok) {
+                    closeDeleteModal();
+                    loadUsers(); // Reload
+                } else {
+                    const txt = await res.text();
+                    alert("Ошибка: " + txt);
+                }
+            } catch (e) {
+                alert("Ошибка сети");
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        // --- EDIT LOGIC ---
+        function editUser(email, currentName, currentElo) {
+            // Populate Modal
+            document.getElementById('edit-email').value = email;
+            document.getElementById('edit-name').value = currentName === 'null' ? '' : currentName; // Handle 'null' string if any
+            document.getElementById('edit-elo').value = currentElo;
+            
+            // Show
+            document.getElementById('modal-edit-user').classList.remove('hidden');
+        }
+
+        function closeEditModal() {
+            document.getElementById('modal-edit-user').classList.add('hidden');
+        }
+
+        async function saveEditUser() {
+            const email = document.getElementById('edit-email').value;
+            const newName = document.getElementById('edit-name').value;
+            const newElo = document.getElementById('edit-elo').value;
+            
+            const btn = document.getElementById('save-edit-btn');
+            const originalText = btn.textContent;
+            btn.textContent = 'Сохранение...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/api/admin/users/update', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: email,
+                        name: newName,
+                        elo: parseInt(newElo)
+                    })
+                });
+
+                if (res.ok) {
+                    closeEditModal();
+                    loadUsers();
+                } else {
+                    alert("Ошибка при обновлении");
+                }
+            } catch (e) {
+                alert("Ошибка сети");
+            } finally {
+                btn.textContent = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        function renderUsers(users) {
+            const tbody = document.getElementById('users-table-body');
+            tbody.innerHTML = '';
+
+            document.getElementById('total-users').textContent = users.length;
+            document.getElementById('active-games').textContent = "?";
+
+            users.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-gray-50 transition border-b border-gray-100 last:border-0";
+
+                const isAdmin = u.is_admin === 1;
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 font-medium text-gray-900">${u.email}</td>
+                    <td class="px-6 py-4 text-gray-600">${u.name || '-'}</td>
+                    <td class="px-6 py-4 text-center font-bold font-mono text-indigo-600">${u.elo}</td>
+                    <td class="px-6 py-4 text-center text-gray-500">${u.games_count}</td>
+                    <td class="px-6 py-4 text-center">
+                        ${isAdmin
+                        ? '<span class="px-2 py-1 bg-purple-100 text-purple-700 rounded-md text-xs font-bold uppercase">Admin</span>'
+                        : '<span class="px-2 py-1 bg-gray-100 text-gray-500 rounded-md text-xs font-bold uppercase">User</span>'}
+                    </td>
+                    <td class="px-6 py-4 text-right flex justify-end gap-2">
+                        <button onclick="editUser('${u.email}', '${u.name || ''}', ${u.elo})" class="text-indigo-500 hover:text-indigo-700 p-1 hover:bg-indigo-50 rounded" title="Edit">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
+                        </button>
+                        ${!isAdmin
+                        ? `<button onclick="banUser('${u.email}')" class="text-red-500 hover:text-red-700 p-1 hover:bg-red-50 rounded ml-1" title="Delete">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                           </button>`
+                        : ''}
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Logic
+        function switchTab(tabName) {
+            // Hide all
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.querySelectorAll('[id^="tab-btn-"]').forEach(el => {
+                el.classList.remove('border-indigo-600', 'text-indigo-600');
+                el.classList.add('border-transparent', 'text-gray-500');
+            });
+
+            // Show one
+            document.getElementById(`tab-content-${tabName}`).classList.remove('hidden');
+            const btn = document.getElementById(`tab-btn-${tabName}`);
+            btn.classList.remove('border-transparent', 'text-gray-500');
+            btn.classList.add('border-indigo-600', 'text-indigo-600');
+
+            if (tabName === 'games') loadGames();
+            if (tabName === 'analytics') loadStats();
+        }
+
+        async function loadGames() {
+            const tbody = document.getElementById('games-table-body');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">Загрузка...</td></tr>';
+            try {
+                const res = await fetch('/api/admin/games');
+                if (!res.ok) return;
+                const games = await res.json();
+
+                tbody.innerHTML = '';
+                games.forEach(g => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 border-b border-gray-100";
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 text-gray-400 text-xs">#${g.id}</td>
+                        <td class="px-6 py-4 text-gray-700">${g.player1_email}</td>
+                        <td class="px-6 py-4 text-gray-700">${g.player2_email}</td>
+                        <td class="px-6 py-4 text-center font-bold font-mono">${g.player1_score} : ${g.player2_score}</td>
+                        <td class="px-6 py-4 font-bold text-green-600">${g.winner_email || '-'}</td>
+                        <td class="px-6 py-4 text-right text-gray-400 text-xs">${new Date(g.created_at).toLocaleString()}</td>
+                     `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) { console.error(e); }
+        }
+
+        function loadUsers() {
+            checkAdminAccess();
+        }
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/admin/stats');
+                const data = await res.json();
+
+                // Header stats
+                document.getElementById('total-users').textContent = data.total_users;
+                document.getElementById('active-games').textContent = data.active_games;
+
+                // Analytics tab stats
+                const visitsEl = document.getElementById('stat-visits-today');
+                if (visitsEl) visitsEl.textContent = data.visits_today;
+
+                const gamesEl = document.getElementById('stat-total-games');
+                if (gamesEl) gamesEl.textContent = data.total_games;
+
+                // Load Sessions
+                const sRes = await fetch('/api/admin/sessions');
+                if (sRes.ok) {
+                    const sessions = await sRes.json();
+                    const tbody = document.getElementById('sessions-table-body');
+                    if (tbody) {
+                        tbody.innerHTML = '';
+                        sessions.forEach(s => {
+                            const tr = document.createElement('tr');
+                            tr.className = "hover:bg-gray-50 border-b border-gray-100";
+
+                            // Calculate duration formatted
+                            const dur = s.duration_sec;
+                            let durText = dur + 's';
+                            if (dur > 60) durText = Math.floor(dur / 60) + 'm ' + (dur % 60) + 's';
+                            if (dur > 3600) durText = Math.floor(dur / 3600) + 'h ' + Math.floor((dur % 3600) / 60) + 'm';
+
+                            tr.innerHTML = `
+                                <td class="px-6 py-4 font-medium text-gray-900">${s.user_email}</td>
+                                <td class="px-6 py-4 text-gray-500 text-xs">${new Date(s.start_time * 1000).toLocaleString()}</td>
+                                <td class="px-6 py-4 text-gray-500 text-xs">${new Date(s.last_seen * 1000).toLocaleString()}</td>
+                                <td class="px-6 py-4 font-mono font-bold text-indigo-600">${durText}</td>
+                                <td class="px-6 py-4 text-right text-gray-400 text-xs font-mono">${s.ip}</td>
+                             `;
+                            tbody.appendChild(tr);
+                        });
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        // Init
+        checkAdminAccess();
+        loadStats();
+    </script>
+</body>
+
+</html>

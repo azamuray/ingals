@@ -85,16 +85,18 @@
     <div
       class="w-full flex items-center justify-between mb-2 px-2 sticky top-0 z-50 py-2 rounded-xl backdrop-filter backdrop-blur-sm transition-all duration-300"
       id="global-header">
-      <a href="/"
-        class="text-3xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer no-underline opacity-90 hover:opacity-100">
-        <span>🧠</span> Ingals
-      </a>
+      <div class="flex items-center gap-3 text-3xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight">
+        <span onclick="handleLogoClick(event)" class="cursor-pointer hover:scale-110 transition-transform select-none"
+          title="Admin">🧠</span>
+        <a href="/"
+          class="hover:scale-105 transition-transform no-underline text-white cursor-pointer select-none">Ingals</a>
+      </div>
 
       <!-- Header Profile Area -->
       <div id="header-profile-area"
-        class="hidden flex items-center gap-2 bg-white bg-opacity-90 p-1.5 pr-3 rounded-full shadow-lg border-2 border-white/50 backdrop-blur-md transform hover:scale-105 transition-all duration-300 mt-1">
-        <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-          onclick="openProfile('me')">
+        class="hidden flex items-center gap-2 bg-white bg-opacity-90 p-1.5 pr-3 rounded-full shadow-lg border-2 border-white/50 backdrop-blur-md transform hover:scale-105 transition-all duration-300 mt-1 cursor-pointer relative z-50 select-none"
+        onclick="openProfile('me')">
+        <div class="flex items-center gap-2 pointer-events-none">
           <div
             class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-inner">
             👤
@@ -324,7 +326,7 @@
 
         <!-- Profile View Modal -->
         <div id="profile-view-modal"
-          class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center hidden z-50 backdrop-filter backdrop-blur-sm transition-opacity duration-300 p-4 pt-24 md:pt-32">
+          class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center hidden z-[100] backdrop-filter backdrop-blur-sm transition-opacity duration-300 p-4 pt-24 md:pt-32">
           <div
             class="bg-white bg-opacity-95 p-0 rounded-2xl shadow-2xl max-w-2xl w-full border border-white border-opacity-40 flex flex-col h-[85vh] overflow-hidden">
 
@@ -447,6 +449,18 @@
       game: document.getElementById('logged-in-content')
     };
 
+    // Admin Redirect Logic
+    function handleLogoClick(e) {
+      // Prevent default navigation
+      if (e) e.preventDefault();
+
+      if (state.user && state.user.is_admin) {
+        window.location.href = '/admin.html';
+      } else {
+        window.location.href = '/';
+      }
+    }
+
     // Check Auth on Load
     async function checkAuth() {
       // Check if token is present in URL (SSO redirect)
@@ -547,6 +561,10 @@
             </div>
             <span class="font-bold text-sm ${isCurrentUser ? 'text-indigo-600' : 'text-gray-600'}">${player.elo}</span>
           `;
+
+          // Enable Click
+          item.onclick = () => openProfile(player.email);
+          item.style.cursor = 'pointer';
 
           leaderboardList.appendChild(item);
         });
@@ -1196,10 +1214,17 @@
     let currentProfileEmail = null;
 
     window.openProfile = async (identifier) => {
+      // console.log('Opening profile:', identifier);
+      // alert('DEBUG: Clicked ' + identifier); 
+
       try {
         const res = await fetch(`/api/profile/${identifier}`);
-        if (!res.ok) return;
+        if (!res.ok) {
+          alert('Error: Profile fetch failed ' + res.status);
+          return;
+        }
         const data = await res.json();
+        // alert('DEBUG: Data received');
 
         currentProfileEmail = data.email;
 
@@ -1227,8 +1252,8 @@
         // Tabs visibility
         document.getElementById('tab-btn-words').classList.toggle('hidden', !data.is_me);
 
-        // Friendship Actions (New Container)
-        const fsDiv = document.getElementById('friendship-status');
+        // Friendship Actions (Fixed ID)
+        const fsDiv = document.getElementById('profile-friend-actions'); // WAS: friendship-status
         if (fsDiv) {
           fsDiv.innerHTML = '';
 
@@ -1237,7 +1262,7 @@
             const btn = document.createElement('button');
             btn.className = data.is_friend
               ? "w-full py-3 rounded-xl font-bold bg-white text-indigo-600 border border-indigo-200 hover:bg-gray-50 transition shadow-sm"
-              : "w-full py-3 rounded-xl font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition shadow-sm border border-transparent"; // "Gold" complained about? Using indigo/white standard.
+              : "w-full py-3 rounded-xl font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition shadow-sm border border-transparent";
             btn.textContent = data.is_friend ? "⭐ В друзьях (Удалить)" : "☆ Добавить в друзья";
             btn.onclick = async () => {
               if (data.is_friend) await removeFriend(data.email);
@@ -1255,8 +1280,6 @@
         const historyTabP = document.querySelector('#profile-tab-history p');
         if (historyTabP) historyTabP.classList.add('hidden'); // Ensure hidden
 
-        // Words fetching removed (moved to separate page)
-
         // Reset Tab to Stats
         switchProfileTab('stats');
 
@@ -1264,6 +1287,7 @@
 
       } catch (e) {
         console.error(e);
+        alert('JS Error: ' + e.message);
       }
     };
 

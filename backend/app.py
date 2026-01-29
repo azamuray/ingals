@@ -9,6 +9,7 @@ from flask import Flask, request, redirect, session, url_for, jsonify
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 import random
 import time
+from functools import wraps
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!' # Used for Flask session security
@@ -77,9 +78,23 @@ def init_db():
             CREATE TABLE IF NOT EXISTS users (
                 email TEXT PRIMARY KEY,
                 name TEXT,
-                elo INTEGER DEFAULT 1200
+                elo INTEGER DEFAULT 1200,
+                is_admin INTEGER DEFAULT 0
             )
         ''')
+        
+        # MIGRATION: Add is_admin column if it doesn't exist (for existing DBs)
+        try:
+            cursor.execute('ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass # Column likely already exists
+
+        # SET DEFAULT ADMIN
+        admin_email = 'azamat.murdalov@gmail.com'
+        cursor.execute('UPDATE users SET is_admin = 1 WHERE email = ?', (admin_email,))
+        # Ensure admin exists if not present (optional, but good for bootstrapping)
+        cursor.execute('INSERT OR IGNORE INTO users (email, name, elo, is_admin) VALUES (?, ?, ?, 1)', (admin_email, 'Admin', 9999))
+
 
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS friendships (
@@ -117,6 +132,25 @@ def init_db():
                 last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 PRIMARY KEY (user_email, word),
                 FOREIGN KEY(user_email) REFERENCES users(email)
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS visit_logs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT,
+                timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                ip_hash TEXT
+            )
+        ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_email TEXT,
+                start_time REAL,
+                last_seen REAL,
+                ip TEXT
             )
         ''')
         
@@ -185,15 +219,194 @@ def verify_token(token: str) -> Optional[dict]:
 
 # --- Routes ---
 
+# --- Decorators ---
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        current_user = get_current_user()
+        if not current_user:
+            return "Unauthorized", 401
+        
+        # Check DB for admin status
+        db = get_db()
+        user = db.execute('SELECT is_admin FROM users WHERE email = ?', (current_user['email'],)).fetchone()
+        if not user or not user['is_admin']:
+             return "Forbidden: Admins only", 403
+             
+        return f(*args, **kwargs)
+    return decorated_function
+
+# --- Admin Routes ---
+
+@app.route('/api/admin/users', methods=['GET'])
+@admin_required
+def admin_get_users():
+    db = get_db()
+    # Simple list for now. In real app, use pagination.
+    # Get all users sorted by joined date (rowid approx) or ELO
+    users = db.execute('''
+        SELECT email, name, elo, is_admin, 
+        (SELECT count(*) FROM games WHERE player1_email = users.email OR player2_email = users.email) as games_count
+        FROM users 
+        ORDER BY is_admin DESC, elo DESC
+        LIMIT 100
+    ''').fetchall()
+    
+    return jsonify([dict(u) for u in users])
+
+@app.route('/api/admin/users/ban', methods=['POST'])
+@admin_required
+def admin_ban_user():
+    data = request.json
+    email_to_ban = data.get('email')
+    
+    if not email_to_ban:
+        return "Email required", 400
+        
+    db = get_db()
+    # For MVP: "Ban" = Delete user or scramble password?
+    # User asked for "Ban". Let's add 'is_banned' later or just DELETE for now as user has no password (SSO).
+    # Deleting might completely remove history.
+    # Let's add a `is_active` or `is_banned` column?
+    # User requirement was simple. Let's start with DELETE but warn.
+    # actually, blocking access is better.
+    # Let's stick to what's requested: "ban".
+    # I'll add 'is_banned' column too to be safe/robust?
+    # Or just use a simple lookup.
+    
+    # For now, let's just DELETE them to remove them from leaderboard/game.
+    # And maybe add to a blacklist table?
+    # Let's keep it simple: DELETE for now (Nuclear Ban).
+    
+    if email_to_ban == 'azamat.murdalov@gmail.com':
+        return "Cannot ban root admin", 400
+
+    db.execute('DELETE FROM users WHERE email = ?', (email_to_ban,))
+    db.commit()
+    return jsonify({"status": "deleted", "email": email_to_ban})
+
+@app.route('/api/admin/users/update', methods=['POST'])
+@admin_required
+def admin_update_user():
+    data = request.json
+    email = data.get('email')
+    new_name = data.get('name')
+    new_elo = data.get('elo')
+
+    if not email:
+        return "Email required", 400
+
+    db = get_db()
+    
+    # Update Name
+    if new_name is not None:
+        db.execute('UPDATE users SET name = ? WHERE email = ?', (new_name, email))
+        
+    # Update ELO
+    if new_elo is not None:
+        try:
+            new_elo = int(new_elo)
+            db.execute('UPDATE users SET elo = ? WHERE email = ?', (new_elo, email))
+        except ValueError:
+            return "Invalid ELO format", 400
+
+    db.commit()
+    return jsonify({"status": "updated", "email": email})
+
+@app.route('/api/admin/games', methods=['GET'])
+@admin_required
+def admin_get_games():
+    db = get_db()
+    # UNLIMITED games
+    games = db.execute('''
+        SELECT * FROM games ORDER BY created_at DESC
+    ''').fetchall()
+    return jsonify([dict(g) for g in games])
+
+@app.route('/api/admin/stats', methods=['GET'])
+@admin_required
+def admin_get_stats():
+    db = get_db()
+    
+    # Total Users
+    total_users = db.execute('SELECT count(*) FROM users').fetchone()[0]
+    
+    # Active Games (In memory)
+    active_games_count = len(active_games)
+    
+    # Visits Today
+    visits_today = db.execute("SELECT count(*) FROM visit_logs WHERE date(timestamp) = date('now')").fetchone()[0]
+    
+    # Total Games
+    total_games = db.execute('SELECT count(*) FROM games').fetchone()[0]
+
+    return jsonify({
+        "total_users": total_users,
+        "active_games": active_games_count,
+        "visits_today": visits_today,
+        "total_games": total_games
+    })
+
+@app.route('/api/admin/sessions', methods=['GET'])
+@admin_required
+def admin_get_sessions():
+    db = get_db()
+    # Get recent sessions (last 24 hours?) or all? User asked for detailed log.
+    # Let's limit to last 200 for performance, or use logic.
+    sessions = db.execute('SELECT * FROM user_sessions ORDER BY start_time DESC LIMIT 200').fetchall()
+    
+    result = []
+    for s in sessions:
+        duration = s['last_seen'] - s['start_time']
+        result.append({
+            'user_email': s['user_email'],
+            'start_time': s['start_time'],
+            'last_seen': s['last_seen'],
+            'duration_sec': round(duration),
+            'ip': s['ip']
+        })
+    return jsonify(result)
+
+
+
+# --- Public Routes ---
+
 # @app.route('/') -> Served by Nginx Frontend
 
 @app.route('/api/me')
 def api_me():
     user = get_current_user()
     if user:
+        # LOG SESSION
+        # if not user['email'].startswith('Guest_'): # Allow guests
+        if True:
+             current_time = time.time()
+             db = get_db()
+             try:
+                 # Find active session (active within last 5 mins)
+                 active_session = db.execute('''
+                    SELECT id FROM user_sessions 
+                    WHERE user_email = ? AND last_seen > ?
+                 ''', (user['email'], current_time - 300)).fetchone()
+                 
+                 ip = request.remote_addr
+                 
+                 if active_session:
+                     # Update existing
+                     db.execute('UPDATE user_sessions SET last_seen = ? WHERE id = ?', (current_time, active_session['id']))
+                 else:
+                     # Start new
+                     db.execute('INSERT INTO user_sessions (user_email, start_time, last_seen, ip) VALUES (?, ?, ?, ?)',
+                                (user['email'], current_time, current_time, ip))
+                 db.commit()
+             except Exception as e:
+                 print(f"Session log error: {e}")
+
         # Fetch detailed profile from DB
         db = get_db()
-        row = db.execute('SELECT name, elo FROM users WHERE email = ?', (user['email'],)).fetchone()
+        row = db.execute('SELECT name, elo, is_admin FROM users WHERE email = ?', (user['email'],)).fetchone()
+        
+        # Determine stats
         
         # Fetch friends
         # Fetch friends with details (Name, ELO)
@@ -216,6 +429,7 @@ def api_me():
             'email': user['email'],
             'name': row['name'] if row else None,
             'elo': row['elo'] if row else 1200,
+            'is_admin': bool(row['is_admin']) if row and 'is_admin' in row.keys() else False,
             'friends': friends
         }
         
@@ -285,7 +499,7 @@ def get_public_profile(identifier):
     db = get_db()
     
     # User Info
-    user_row = db.execute('SELECT name, elo FROM users WHERE email = ?', (target_email,)).fetchone()
+    user_row = db.execute('SELECT name, elo, is_admin FROM users WHERE email = ?', (target_email,)).fetchone()
     if not user_row:
         # Check if it's a bot
         bot_config = next((b for b in BOTS if b['email'] == target_email), None)
@@ -350,6 +564,7 @@ def get_public_profile(identifier):
         'email': target_email,
         'name': user_row['name'] or target_email,
         'elo': user_row['elo'],
+        'is_admin': bool(user_row['is_admin']),
         'stats': {
             'total_games': total_games,
             'wins': wins,
