@@ -132,19 +132,7 @@ def init_db():
             
             print(f"Added/Updated bot: {bot['name']}")
 
-        # Test Data Injection (Check if exists)
-        test_user_check = cursor.execute("SELECT count(*) FROM users WHERE email LIKE 'Test_User_%'").fetchone()[0]
-        if test_user_check < 30:
-            print("Injecting 30 Test Users for Leaderboard verification...")
-            for i in range(1, 41):
-                t_email = f"Test_User_{i}@example.com"
-                t_name = f"Test User {i}"
-                t_elo = random.randint(1200, 1500)
-                try:
-                    cursor.execute("INSERT INTO users (email, name, elo) VALUES (?, ?, ?)", (t_email, t_name, t_elo))
-                except sqlite3.IntegrityError:
-                    pass 
-            print("Test users injected.")
+        # Test Data Injection REMOVED for production
         
         db.commit()
 
