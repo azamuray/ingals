@@ -73,7 +73,7 @@
   </style>
 </head>
 
-<body class="animated-bg min-h-screen flex items-center justify-center p-2 md:p-4">
+<body class="animated-bg min-h-screen flex items-start justify-center p-2 pt-6 md:pt-12 md:p-4">
 
 
   <div id="loading" class="text-xl text-white font-bold drop-shadow-md">Загрузка...</div>
@@ -81,10 +81,31 @@
   <div class="w-full max-w-lg flex flex-col items-center gap-6">
     <!-- Global Header -->
     <!-- Global Header -->
-    <a href="/"
-      class="text-3xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight mb-2 flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer no-underline opacity-90 hover:opacity-100">
-      <span>🧠</span> Ingals
-    </a>
+    <!-- Global Header -->
+    <div
+      class="w-full flex items-center justify-between mb-2 px-2 sticky top-0 z-50 py-2 rounded-xl backdrop-filter backdrop-blur-sm transition-all duration-300"
+      id="global-header">
+      <a href="/"
+        class="text-3xl md:text-5xl font-extrabold text-white drop-shadow-lg tracking-tight flex items-center gap-3 hover:scale-105 transition-transform cursor-pointer no-underline opacity-90 hover:opacity-100">
+        <span>🧠</span> Ingals
+      </a>
+
+      <!-- Header Profile Area -->
+      <div id="header-profile-area"
+        class="hidden flex items-center gap-2 bg-white bg-opacity-90 p-1.5 pr-3 rounded-full shadow-lg border-2 border-white/50 backdrop-blur-md transform hover:scale-105 transition-all duration-300 mt-1">
+        <div class="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+          onclick="openProfile('me')">
+          <div
+            class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-inner">
+            👤
+          </div>
+          <div class="flex flex-col leading-none">
+            <span id="header-user-name" class="text-xs font-bold text-gray-800"></span>
+            <span id="header-user-elo" class="text-[10px] font-bold text-indigo-600"></span>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- Авторизация -->
     <div id="auth-area"
@@ -115,19 +136,7 @@
       <div id="user-info-area"
         class="glass-card p-4 md:p-6 rounded-2xl w-full transform transition-all hover:scale-[1.01] duration-300">
         <!-- User Info Header -->
-        <div
-          class="flex items-center justify-between mb-8 bg-white bg-opacity-60 p-4 rounded-xl shadow-sm border border-gray-100">
-          <div class="flex items-center space-x-2 cursor-pointer hover:opacity-80 transition-opacity"
-            onclick="openProfile('me')">
-            <div
-              class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-bold text-xs shadow-md">
-              👤
-            </div>
-            <span id="user-email" class="text-sm text-gray-700 font-semibold tracking-wide"></span>
-          </div>
-          <a href="/logout"
-            class="text-xs font-bold text-red-500 hover:text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1 rounded-full transition-colors">Выйти</a>
-        </div>
+
 
 
 
@@ -143,8 +152,8 @@
             <select id="rounds-selector"
               class="px-3 py-1.5 rounded-lg border-2 border-indigo-100 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none font-bold text-gray-700 bg-indigo-50 cursor-pointer text-sm">
               <option value="5">5 ⚡</option>
-              <option value="10">10 🔥</option>
-              <option value="15" selected>15 ⭐</option>
+              <option value="10" selected>10 🔥</option>
+              <option value="15">15 ⭐</option>
               <option value="20">20 💪</option>
               <option value="30">30 🏆</option>
             </select>
@@ -201,6 +210,38 @@
               <button id="accept-btn"
                 class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl hover:shadow-lg transition font-extrabold text-sm tracking-wide shadow-md uppercase">ПРИНЯТЬ</button>
             </div>
+          </div>
+        </div>
+
+        <!-- Words View Page (Full Screen Replacement) -->
+        <!-- Words View Page (Full Screen Replacement) -->
+        <!-- Words View Page (Full Screen Replacement) -->
+        <div id="words-view" class="hidden w-full flex flex-col mb-10">
+          <!-- Header -->
+          <div class="mb-4 flex items-center justify-between">
+            <button onclick="closeWordsView()"
+              class="text-gray-500 hover:text-indigo-600 font-bold transition flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-100">
+              <span class="text-lg">←</span> Назад
+            </button>
+            <h2 class="text-xl font-black text-gray-800">Мои слова</h2>
+            <div class="w-16"></div> <!-- Spacer -->
+          </div>
+
+          <!-- Stats Bar -->
+          <div class="flex gap-2 mb-4 shrink-0">
+            <span
+              class="flex-1 text-xs font-bold bg-green-100 text-green-700 px-3 py-2 rounded-xl text-center shadow-sm border border-green-200">
+              Выучено: <span id="page-words-learned-count" class="text-lg block">0</span>
+            </span>
+            <span
+              class="flex-1 text-xs font-bold bg-yellow-100 text-yellow-700 px-3 py-2 rounded-xl text-center shadow-sm border border-yellow-200">
+              В процессе: <span id="page-words-learning-count" class="text-lg block">0</span>
+            </span>
+          </div>
+
+          <!-- List -->
+          <div id="full-words-list" class="space-y-3">
+            <!-- Words injected here -->
           </div>
         </div>
 
@@ -283,43 +324,48 @@
 
         <!-- Profile View Modal -->
         <div id="profile-view-modal"
-          class="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center hidden z-50 backdrop-filter backdrop-blur-sm transition-opacity duration-300">
+          class="fixed inset-0 bg-black bg-opacity-60 flex items-start justify-center hidden z-50 backdrop-filter backdrop-blur-sm transition-opacity duration-300 p-4 pt-24 md:pt-32">
           <div
-            class="bg-white bg-opacity-95 p-0 rounded-2xl shadow-2xl max-w-2xl w-full mx-4 border border-white border-opacity-40 flex flex-col max-h-[90vh] overflow-hidden">
+            class="bg-white bg-opacity-95 p-0 rounded-2xl shadow-2xl max-w-2xl w-full border border-white border-opacity-40 flex flex-col h-[85vh] overflow-hidden">
 
             <!-- Header -->
-            <div class="p-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white relative">
+            <div class="p-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white relative flex-shrink-0">
               <button onclick="document.getElementById('profile-view-modal').classList.add('hidden')"
                 class="absolute top-4 right-4 text-white text-opacity-70 hover:text-opacity-100 text-2xl font-bold">&times;</button>
-              <div class="flex items-center gap-4">
-                <div
-                  class="w-16 h-16 rounded-full bg-white text-indigo-600 flex items-center justify-center text-3xl font-bold border-4 border-white border-opacity-30">
-                  👤
-                </div>
-                <div>
-                  <h2 id="profile-view-name" class="text-2xl font-black tracking-tight">Name</h2>
-                  <div class="flex items-center gap-3 text-sm text-indigo-100 font-medium">
-                    <span id="profile-view-elo">ELO: 0</span>
-                    <span id="profile-view-status"
-                      class="bg-green-400 bg-opacity-20 px-2 py-0.5 rounded text-xs border border-green-300 border-opacity-30 hidden">Friend</span>
+
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                  <div
+                    class="w-16 h-16 rounded-full bg-white text-indigo-600 flex items-center justify-center text-3xl font-bold shadow-lg">
+                    👤
+                  </div>
+                  <div>
+                    <h2 id="profile-view-name" class="text-2xl font-black tracking-tight">Name</h2>
+                    <div class="flex items-center gap-3 text-sm text-indigo-100 font-medium">
+                      <span id="profile-view-elo">ELO: 0</span>
+                      <span id="profile-view-status"
+                        class="bg-green-400 bg-opacity-20 px-2 py-0.5 rounded text-xs border border-green-300 border-opacity-30 hidden">Friend</span>
+                    </div>
                   </div>
                 </div>
+
               </div>
             </div>
 
             <!-- Tabs -->
             <div
-              class="flex border-b border-gray-100 px-4 md:px-6 pt-2 gap-4 md:gap-6 text-sm font-bold text-gray-500 overflow-x-auto custom-scrollbar whitespace-nowrap">
+              class="flex border-b border-gray-100 px-4 md:px-6 pt-2 gap-4 md:gap-6 text-sm font-bold text-gray-500 overflow-x-auto custom-scrollbar whitespace-nowrap bg-white flex-shrink-0">
               <button onclick="switchProfileTab('stats')" id="tab-btn-stats"
                 class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors flex-shrink-0">Статистика</button>
               <button onclick="switchProfileTab('history')" id="tab-btn-history"
                 class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors flex-shrink-0">История</button>
-              <button onclick="switchProfileTab('words')" id="tab-btn-words"
-                class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors hidden flex-shrink-0">Слова</button>
+              <button onclick="openWordsView()" id="tab-btn-words"
+                class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors hidden flex-shrink-0">Слова
+                ↗</button>
             </div>
 
             <!-- Content -->
-            <div class="p-6 overflow-y-auto bg-gray-50 flex-1 custom-scrollbar">
+            <div class="p-6 overflow-y-auto bg-gray-50 flex-1 custom-scrollbar min-h-0 overscroll-contain">
 
               <!-- Stats Tab -->
               <div id="profile-tab-stats" class="space-y-4">
@@ -351,18 +397,15 @@
                 <p class="text-center text-gray-400 text-sm py-4">История доступна только для вашего профиля.</p>
                 <div id="history-list" class="space-y-2"></div>
               </div>
+            </div>
 
-              <!-- Words Tab -->
-              <div id="profile-tab-words" class="hidden space-y-4">
-                <div class="flex gap-2 mb-4">
-                  <span class="text-xs font-bold bg-green-100 text-green-700 px-2 py-1 rounded">Выучено: <span
-                      id="words-learned-count">0</span></span>
-                  <span class="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded">В процессе: <span
-                      id="words-learning-count">0</span></span>
-                </div>
-                <div id="words-list" class="grid grid-cols-2 gap-2"></div>
-              </div>
-
+            <!-- Footer (Logout) -->
+            <div id="profile-footer"
+              class="p-4 bg-white border-t border-gray-100 flex justify-end hidden flex-shrink-0">
+              <a href="/logout"
+                class="flex items-center gap-2 text-red-500 hover:text-red-700 font-bold text-sm px-4 py-2 rounded-lg hover:bg-red-50 transition-colors">
+                <span>🚪</span> Выйти из аккаунта
+              </a>
             </div>
           </div>
         </div>
@@ -436,14 +479,22 @@
     function showAuthUI() {
       views.auth.classList.remove('hidden');
       views.game.classList.add('hidden');
+      document.getElementById('header-profile-area').classList.add('hidden');
     }
 
     function initGameUI(user) {
       views.auth.classList.add('hidden');
       views.game.classList.remove('hidden');
+      document.getElementById('header-profile-area').classList.remove('hidden');
 
       const displayName = user.name || user.email;
-      document.getElementById('user-email').textContent = `${displayName} (${user.elo || 1200})`;
+      // Truncate name for header if too long
+      const shortName = displayName.length > 12 ? displayName.substring(0, 10) + '..' : displayName;
+
+      document.getElementById('header-user-name').textContent = shortName;
+      document.getElementById('header-user-elo').textContent = `${user.elo || 1200} ELO`;
+
+      // Removed old user-email element update since it's deleted
 
       if (!user.name && !user.email.startsWith('Guest_')) {
         document.getElementById('profile-modal').classList.remove('hidden');
@@ -469,19 +520,30 @@
         }
 
         leaderboardList.innerHTML = '';
+        leaderboardList.innerHTML = '';
         players.forEach((player, index) => {
           const item = document.createElement('div');
-          const isCurrentUser = state.user && (player.name === state.user.name || player.name === state.user.email);
+
+          // Handle "Me outside top 30" special case
+          if (player.is_me_outside) {
+            const separator = document.createElement('div');
+            separator.className = 'text-center text-gray-400 font-bold text-xs my-1';
+            separator.textContent = '•••';
+            leaderboardList.appendChild(separator);
+          }
+
+          const isCurrentUser = state.user && (player.email === state.user.email);
+          const rankDisplay = player.rank ? `#${player.rank}` : `#${index + 1}`;
 
           item.className = `flex justify-between items-center p-3 rounded-lg transition-all ${isCurrentUser
-            ? 'bg-indigo-100 border-2 border-indigo-400 font-bold'
+            ? 'bg-indigo-100 border-2 border-indigo-400 font-bold scale-[1.02] shadow-sm'
             : 'bg-white bg-opacity-70 hover:bg-opacity-90'
             }`;
 
           item.innerHTML = `
             <div class="flex items-center gap-3">
-              <span class="text-lg font-black ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-orange-400' : 'text-gray-500'}">#${index + 1}</span>
-              <span class="text-sm ${isCurrentUser ? 'text-indigo-800' : 'text-gray-700'}">${player.name}</span>
+              <span class="text-lg font-black ${index === 0 ? 'text-yellow-500' : index === 1 ? 'text-gray-400' : index === 2 ? 'text-orange-400' : 'text-gray-500'} w-8 text-right">${rankDisplay}</span>
+              <span class="text-sm ${isCurrentUser ? 'text-indigo-800' : 'text-gray-700'} truncate max-w-[120px] md:max-w-[150px]">${player.name}</span>
             </div>
             <span class="font-bold text-sm ${isCurrentUser ? 'text-indigo-600' : 'text-gray-600'}">${player.elo}</span>
           `;
@@ -589,11 +651,29 @@
 
       socket.on('lobby_update', (data) => {
         // Handle both old list format and new {players, online_count} format
+        let players = [];
+        let onlineCount = 0;
+
         if (Array.isArray(data)) {
-          renderLobby(data);
+          players = data;
+          onlineCount = players.length;
         } else {
-          renderLobby(data.players);
-          document.getElementById('online-count').textContent = data.online_count || data.players.length;
+          players = data.players;
+          onlineCount = data.online_count || players.length;
+        }
+
+        renderLobby(players);
+        document.getElementById('online-count').textContent = onlineCount;
+
+        // Auto-close challenge modal if challenger disappeared from lobby
+        if (currentChallengerSid && !document.getElementById('challenge-modal').classList.contains('hidden')) {
+          const challengerStillHere = players.find(p => p.sid === currentChallengerSid);
+          if (!challengerStillHere) {
+            console.log("Challenger left, closing modal");
+            document.getElementById('challenge-modal').classList.add('hidden');
+            currentChallengerSid = null;
+            alert("Игрок, бросивший вызов, вышел.");
+          }
         }
       });
 
@@ -723,6 +803,12 @@
           const diff = data.elo_update.new - data.elo_update.old;
           const sign = diff >= 0 ? '+' : '';
           msg += `<br><span class="text-sm mt-2 block ${diff >= 0 ? 'text-green-600' : 'text-red-500'}">Рейтинг: ${data.elo_update.old} ➝ ${data.elo_update.new} (${sign}${diff})</span>`;
+
+          // Auto-update local state and header
+          if (state.user) {
+            state.user.elo = data.elo_update.new;
+            document.getElementById('header-user-elo').textContent = `${data.elo_update.new} ELO`;
+          }
         }
 
         // If Guest won, offer to save progress
@@ -789,17 +875,25 @@
 
       playersListDiv.innerHTML = '';
 
-      // Filter out self AND apply search filter
-      const others = listToRender.filter(p => {
-        if (p.sid === socket.id) return false;
-        const searchTarget = (p.name || p.email).toLowerCase();
-        return searchTarget.includes(searchTerm);
-      });
+      // process rich friends map
+      const userFriendsMap = new Map();
+      const userFriendEmails = new Set();
+      if (state.user && state.user.friends) {
+        state.user.friends.forEach(f => {
+          if (typeof f === 'string') {
+            userFriendEmails.add(f);
+            userFriendsMap.set(f, { name: f, elo: '?' });
+          } else {
+            userFriendEmails.add(f.email);
+            userFriendsMap.set(f.email, { name: f.name || f.email, elo: f.elo });
+          }
+        });
+      }
 
-      const userFriends = new Set(state.user && state.user.friends ? state.user.friends : []);
+      // Filter: Exclude me
+      const others = listToRender.filter(p => p.sid !== socket.id);
 
-
-      if (others.length === 0) {
+      if (others.length === 0 && userFriendEmails.size === 0) {
         if (searchTerm) {
           playersListDiv.innerHTML = '<p class="text-gray-400 text-sm  text-center py-4">Ничего не найдено 🔍</p>';
         } else {
@@ -808,88 +902,144 @@
         return;
       }
 
+      // Identify Offline Friends
+      const onlineEmails = new Set(listToRender.map(p => p.email));
+      const offlineFriends = [];
+
+      userFriendsMap.forEach((details, email) => {
+        if (!onlineEmails.has(email)) {
+          // Only add if matches search
+          if (!searchTerm || email.toLowerCase().includes(searchTerm) || details.name.toLowerCase().includes(searchTerm)) {
+            offlineFriends.push({
+              email: email,
+              name: details.name,
+              elo: details.elo,
+              is_offline: true
+            });
+          }
+        }
+      });
+
+      // Sort Offline Friends
+      offlineFriends.sort((a, b) => a.email.localeCompare(b.email));
+
       others.sort((a, b) => {
         // 1. Friends First
-        const isFriendA = userFriends.has(a.email);
-        const isFriendB = userFriends.has(b.email);
+        const isFriendA = userFriendEmails.has(a.email);
+        const isFriendB = userFriendEmails.has(b.email);
         if (isFriendA && !isFriendB) return -1;
         if (!isFriendA && isFriendB) return 1;
 
         // 2. Humans before Bots
-        // Note: Backend sends is_bot flag
         if (!a.is_bot && b.is_bot) return -1;
         if (a.is_bot && !b.is_bot) return 1;
 
-        // 3. Name (optional, stable sort)
-        return 0;
+        // 3. ELO
+        return b.elo - a.elo;
       });
 
-      others.forEach(player => {
-        const isFriend = state.user && state.user.friends ? state.user.friends.includes(player.email) : false;
+      // Filter others by search (moved here to apply after friends check logic if needed, but simplest is filter first or here)
+      // Original logic filtered `others` early. Let's filter `others` for search too.
+      const filteredOthers = others.filter(p => {
+        const searchTarget = (p.name || p.email).toLowerCase();
+        return searchTarget.includes(searchTerm);
+      });
 
-        const div = document.createElement('div');
-        div.className = `flex justify-between items-center bg-white bg-opacity-80 p-4 rounded-xl shadow-sm border ${isFriend ? 'border-amber-300 bg-amber-50' : 'border-gray-100'} transform hover:scale-[1.02] transition-all duration-200`;
+      filteredOthers.forEach(player => {
+        renderPlayerRow(player, true, userFriendEmails);
+      });
 
-        const leftSection = document.createElement('div');
-        leftSection.className = 'flex items-center gap-3 cursor-pointer hover:opacity-70 transition-opacity min-w-0 pr-2'; // Added min-w-0 and padding right
-        leftSection.onclick = (e) => {
-          e.stopPropagation();
-          openProfile(player.email);
-        };
+      // Render Offline Friends
+      offlineFriends.forEach(friend => {
+        renderPlayerRow(friend, false, userFriendEmails);
+      });
+    }
 
-        // Friend Action Button
-        const friendBtn = document.createElement('button');
-        friendBtn.className = 'text-lg focus:outline-none transition-transform active:scale-95 hover:scale-110';
-        friendBtn.title = isFriend ? "Удалить из друзей" : "Добавить в друзья";
-        friendBtn.textContent = isFriend ? '⭐' : '☆';
+    function renderPlayerRow(player, isOnline, userFriendEmails) {
+      // Use Set for fast lookup if provided, otherwise fallback (robustness)
+      const isFriend = userFriendEmails
+        ? userFriendEmails.has(player.email)
+        : (state.user && state.user.friends ? state.user.friends.some(f => (typeof f === 'string' ? f : f.email) === player.email) : false);
 
-        friendBtn.onclick = (e) => {
-          e.stopPropagation(); // Prevent other clicks
-          if (isFriend) {
-            removeFriend(player.email);
-          } else {
-            addFriend(player.email);
-          }
-        };
+      const div = document.createElement('div');
+      // Removed bg-amber-50 for friends to keep background consistent (per user request)
+      // Only keeping border for slight distinction, or just removing friend styling entirely from row logic
+      div.className = `flex justify-between items-center p-4 rounded-xl shadow-sm border transform transition-all duration-200 ${isOnline
+        ? (isFriend ? 'border-indigo-200 bg-white hover:scale-[1.02]' : 'border-gray-100 bg-white bg-opacity-80 hover:scale-[1.02]')
+        : 'border-gray-100 bg-gray-100 bg-opacity-50 grayscale'
+        }`;
 
+      const leftSection = document.createElement('div');
+      leftSection.className = 'flex items-center gap-3 cursor-pointer hover:opacity-70 transition-opacity min-w-0 pr-2';
+      leftSection.onclick = (e) => {
+        e.stopPropagation();
+        openProfile(player.email);
+      };
 
-        const nameSpan = document.createElement('div');
-        nameSpan.className = 'flex flex-col text-left min-w-0'; // Added min-w-0 to allow truncate
+      // Friend Action Button
+      const friendBtn = document.createElement('button');
+      friendBtn.className = 'text-lg focus:outline-none transition-transform active:scale-95 hover:scale-110';
+      friendBtn.title = isFriend ? "Удалить из друзей" : "Добавить в друзья";
+      friendBtn.textContent = isFriend ? '⭐' : '☆';
 
-        const emailText = document.createElement('span');
-        emailText.className = 'font-bold text-gray-800 text-sm flex items-center gap-2 truncate block'; // Added truncate block
+      friendBtn.onclick = (e) => {
+        e.stopPropagation(); // Prevent other clicks
 
-        // Show Name if available, fallback to Email
-        let baseName = player.name || player.email;
-        let eloPart = ` [${player.elo}]`;
+        // Optimistic UI Update
+        const isNowFriend = !isFriend;
 
-        // Truncate logic: Max 23 chars for NAME only
-        const MAX_NAME_LEN = 23;
+        // Update Icon immediately
+        friendBtn.textContent = isNowFriend ? '⭐' : '☆';
+        friendBtn.title = isNowFriend ? "Удалить из друзей" : "Добавить в друзья";
 
-        // If name is longer than 23, truncate it
-        if (baseName.length > MAX_NAME_LEN) {
-          baseName = baseName.substring(0, MAX_NAME_LEN) + '...';
+        // Update Border Color (optional, keeps UI snappy if we also changed class)
+        // Note: Changing text is usually enough for user feedback
+
+        // Trigger Logic
+        if (isFriend) {
+          removeFriend(player.email);
+        } else {
+          addFriend(player.email);
         }
+      };
 
-        const displayName = `${baseName}${eloPart}`;
 
-        emailText.innerHTML = isFriend
-          ? `<span class="text-amber-600">${displayName}</span>`
-          : displayName;
+      const nameSpan = document.createElement('div');
+      nameSpan.className = 'flex flex-col text-left min-w-0';
 
-        const statusText = document.createElement('span');
-        statusText.className = 'text-xs text-green-500 font-medium';
-        statusText.textContent = '● Онлайн';
+      const emailText = document.createElement('span');
+      emailText.className = 'font-bold text-gray-800 text-sm flex items-center gap-2 truncate block';
 
-        nameSpan.appendChild(emailText);
-        nameSpan.appendChild(statusText);
+      // Show Name if available, fallback to Email
+      let baseName = player.name || player.email;
+      let eloPart = player.elo ? ` [${player.elo}]` : '';
 
-        leftSection.appendChild(friendBtn);
-        leftSection.appendChild(nameSpan);
+      // Truncate logic
+      const MAX_NAME_LEN = 23;
+      if (baseName.length > MAX_NAME_LEN) {
+        baseName = baseName.substring(0, MAX_NAME_LEN) + '...';
+      }
 
-        const btn = document.createElement('button');
+      const displayName = `${baseName}${eloPart}`;
+
+      emailText.innerHTML = (isFriend && isOnline)
+        ? `<span class="text-amber-600">${displayName}</span>`
+        : displayName;
+
+      const statusText = document.createElement('span');
+      statusText.className = isOnline ? 'text-xs text-green-500 font-medium' : 'text-xs text-gray-400 font-medium';
+      statusText.textContent = isOnline ? '● Онлайн' : '○ Офлайн';
+
+      nameSpan.appendChild(emailText);
+      nameSpan.appendChild(statusText);
+
+      leftSection.appendChild(friendBtn);
+      leftSection.appendChild(nameSpan);
+
+      const btn = document.createElement('button');
+      if (isOnline) {
         btn.textContent = '⚔️ Вызвать';
-        btn.className = 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1 text-xs md:px-4 md:py-2 rounded-lg font-bold shadow hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 tracking-wide uppercase whitespace-nowrap'; // Smaller padding on mobile
+        btn.className = 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-3 py-1 text-xs md:px-4 md:py-2 rounded-lg font-bold shadow hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200 tracking-wide uppercase whitespace-nowrap';
         btn.onclick = () => {
           const selectedRounds = parseInt(document.getElementById('rounds-selector').value);
           console.log('Sending challenge to:', player.sid, 'with rounds:', selectedRounds);
@@ -898,11 +1048,24 @@
           btn.className = 'bg-gray-300 text-gray-500 px-4 py-2 rounded-lg text-xs font-bold shadow-none cursor-not-allowed';
           btn.disabled = true;
         };
+      } else {
+        btn.textContent = 'Офлайн';
+        btn.className = 'bg-transparent text-gray-400 border border-gray-300 px-3 py-1 text-xs md:px-4 md:py-2 rounded-lg font-bold shadow-none cursor-default whitespace-nowrap';
+        btn.disabled = true;
+      }
 
-        div.appendChild(leftSection);
-        div.appendChild(btn);
-        playersListDiv.appendChild(div);
-      });
+      div.appendChild(leftSection);
+      div.appendChild(btn);
+
+      // Use ID lookup if internal, or assume appended to parent?
+      // Original code: playersListDiv.appendChild(div);
+      // But renderPlayerRow assumes it's being called inside renderLobby where playersListDiv is available?
+      // Wait, 'playersListDiv' is declared inside 'renderLobby' in my new implementation!
+
+      // Original implementation declared playersListDiv globally at top of script?
+      // Let's check. Yes, line 576: const playersListDiv = document.getElementById('players-list');
+      // So it is available globally.
+      document.getElementById('players-list').appendChild(div);
     }
 
     // --- Friend Actions ---
@@ -915,11 +1078,17 @@
           body: JSON.stringify({ friend_email: email })
         });
         if (res.ok) {
-          // Update local state
+          // Update local state (Optimistic logic)
+          // Handle case where friends might be null
           if (!state.user.friends) state.user.friends = [];
-          if (!state.user.friends.includes(email)) {
-            state.user.friends.push(email);
-            renderLobby(null); // Re-render
+
+          // Check if already exists (handle objects vs strings)
+          const exists = state.user.friends.some(f => (typeof f === 'string' ? f : f.email) === email);
+
+          if (!exists) {
+            // Push structured object to match new backend format
+            state.user.friends.push({ email: email, name: email, elo: '?' });
+            renderLobby(null); // Re-render logic
           }
         }
       } catch (e) {
@@ -938,7 +1107,8 @@
         if (res.ok) {
           // Update local state
           if (state.user.friends) {
-            state.user.friends = state.user.friends.filter(f => f !== email);
+            // Filter robustly handling objects/strings
+            state.user.friends = state.user.friends.filter(f => (typeof f === 'string' ? f : f.email) !== email);
             renderLobby(null); // Re-render
           }
         }
@@ -952,11 +1122,12 @@
     };
 
     function resetToLobby() {
+      // Ensure Game is hidden, Lobby shown
       gameArea.classList.add('hidden');
       lobbyArea.classList.remove('hidden');
       gameOverDiv.classList.add('hidden');
       feedbackDiv.style.opacity = 0;
-      document.getElementById('leaderboard-container').classList.remove('hidden'); // Show leaderboard in lobby
+      document.getElementById('leaderboard-container').classList.remove('hidden');
       socket.emit('enter_lobby');
     }
 
@@ -1033,52 +1204,58 @@
         currentProfileEmail = data.email;
 
         // Render Header
-        document.getElementById('profile-view-name').textContent = data.name;
+        document.getElementById('profile-view-name').textContent = data.name || data.email;
         document.getElementById('profile-view-elo').textContent = `ELO: ${data.elo}`;
-        document.getElementById('profile-view-status').classList.toggle('hidden', !data.is_friend);
+        // Hide old status badge if exists
+        const statusEl = document.getElementById('profile-view-status');
+        if (statusEl) statusEl.classList.add('hidden');
+
+        // Logout Button Logic (Footer)
+        const footer = document.getElementById('profile-footer');
+        if (footer) {
+          if (data.is_me) footer.classList.remove('hidden');
+          else footer.classList.add('hidden');
+        }
 
         // Render Stats Main
         document.getElementById('stats-total').textContent = data.stats.total_games;
         document.getElementById('stats-wins').textContent = data.stats.wins;
-        document.getElementById('stats-losses').textContent = data.stats.losses;
+        // Calculate Losses (Total - Wins) for display if backend sends 0
+        const losses = data.stats.total_games - data.stats.wins;
+        document.getElementById('stats-losses').textContent = losses;
 
         // Tabs visibility
         document.getElementById('tab-btn-words').classList.toggle('hidden', !data.is_me);
 
-        // Actions
-        const actionsDiv = document.getElementById('profile-friend-actions');
-        const addFriendBtn = document.getElementById('profile-add-friend-btn');
+        // Friendship Actions (New Container)
+        const fsDiv = document.getElementById('friendship-status');
+        if (fsDiv) {
+          fsDiv.innerHTML = '';
 
-        if (!data.is_me) {
-          actionsDiv.classList.remove('hidden');
-          if (data.is_friend) {
-            addFriendBtn.textContent = "🚫 Удалить из друзей";
-            addFriendBtn.className = "w-full py-3 rounded-xl font-bold bg-red-50 text-red-600 hover:bg-red-100 transition";
-            addFriendBtn.onclick = () => removeFriend(data.email).then(() => openProfile(data.email)); // Reload after action
+          if (!data.is_me) {
+            fsDiv.classList.remove('hidden');
+            const btn = document.createElement('button');
+            btn.className = data.is_friend
+              ? "w-full py-3 rounded-xl font-bold bg-white text-indigo-600 border border-indigo-200 hover:bg-gray-50 transition shadow-sm"
+              : "w-full py-3 rounded-xl font-bold bg-indigo-500 text-white hover:bg-indigo-600 transition shadow-sm border border-transparent"; // "Gold" complained about? Using indigo/white standard.
+            btn.textContent = data.is_friend ? "⭐ В друзьях (Удалить)" : "☆ Добавить в друзья";
+            btn.onclick = async () => {
+              if (data.is_friend) await removeFriend(data.email);
+              else await addFriend(data.email);
+              openProfile(data.email); // Reload
+            };
+            fsDiv.appendChild(btn);
           } else {
-            addFriendBtn.textContent = "⭐ Добавить в друзья";
-            addFriendBtn.className = "w-full py-3 rounded-xl font-bold bg-indigo-100 text-indigo-600 hover:bg-indigo-200 transition";
-            addFriendBtn.onclick = () => addFriend(data.email).then(() => openProfile(data.email));
+            fsDiv.classList.add('hidden');
           }
-        } else {
-          actionsDiv.classList.add('hidden');
         }
 
-        // Fetch private details if ME
-        if (data.is_me) {
-          const statsRes = await fetch('/api/me/stats');
-          if (statsRes.ok) {
-            const stats = await statsRes.json();
-            renderHistory(stats.history);
-            renderWords(stats.words);
-            // Also enable history tab default text removal
-            document.querySelector('#profile-tab-history p').classList.add('hidden');
-          }
-        } else {
-          document.getElementById('history-list').innerHTML = '';
-          document.querySelector('#profile-tab-history p').classList.remove('hidden');
-          document.querySelector('#profile-tab-history p').textContent = "История игр скрыта.";
-        }
+        // Render History (Universal)
+        renderHistory(data.history);
+        const historyTabP = document.querySelector('#profile-tab-history p');
+        if (historyTabP) historyTabP.classList.add('hidden'); // Ensure hidden
+
+        // Words fetching removed (moved to separate page)
 
         // Reset Tab to Stats
         switchProfileTab('stats');
@@ -1092,8 +1269,9 @@
 
     window.switchProfileTab = (tabName) => {
       // Hide all content
-      ['stats', 'history', 'words'].forEach(t => {
-        document.getElementById(`profile-tab-${t}`).classList.add('hidden');
+      ['stats', 'history'].forEach(t => {
+        const tab = document.getElementById(`profile-tab-${t}`);
+        if (tab) tab.classList.add('hidden');
         const btn = document.getElementById(`tab-btn-${t}`);
         if (btn) btn.classList.remove('border-indigo-600', 'text-indigo-600');
       });
@@ -1122,49 +1300,83 @@
       });
     }
 
-    async function toggleWord(word) {
-      try {
-        const res = await fetch('/api/me/words/toggle', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ word })
-        });
-        if (res.ok) {
-          // Refresh profile stats
-          const statsRes = await fetch('/api/me/stats');
-          if (statsRes.ok) {
-            const stats = await statsRes.json();
-            renderWords(stats.words);
-          }
-        }
-      } catch (e) { console.error(e); }
+    // Old words logic removed
+
+
+    // --- Words Page Logic ---
+    function openWordsView() {
+      // Reset Scroll to Top
+      window.scrollTo(0, 0);
+
+      // Close modal if open
+      document.getElementById('profile-view-modal').classList.add('hidden');
+
+      // Hide Lobby/Game
+      views.game.classList.remove('hidden'); // Ensure wrapper is visible
+      document.getElementById('lobby-area').classList.add('hidden');
+      document.getElementById('game-area').classList.add('hidden');
+      document.getElementById('words-view').classList.remove('hidden');
+
+      // Fetch Words
+      fetch('/api/me/stats')
+        .then(res => res.json())
+        .then(data => {
+          if (data.words) renderFullWordsList(data.words);
+        })
+        .catch(console.error);
     }
 
-    function renderWords(words) {
-      const list = document.getElementById('words-list');
+    function closeWordsView() {
+      window.scrollTo(0, 0);
+      document.getElementById('words-view').classList.add('hidden');
+      // Return to Lobby (default safe state)
+      resetToLobby();
+    }
+
+    function renderFullWordsList(words) {
+      const list = document.getElementById('full-words-list');
       list.innerHTML = '';
 
-      // Stats: Count by status
-      // Default to 'learning' if status is missing/null
+      // Stats
       const learnedCount = words.filter(w => w.status === 'learned').length;
-      document.getElementById('words-learned-count').textContent = learnedCount;
-      document.getElementById('words-learning-count').textContent = words.length - learnedCount;
+      document.getElementById('page-words-learned-count').textContent = learnedCount;
+      document.getElementById('page-words-learning-count').textContent = words.length - learnedCount;
+
+      if (words.length === 0) {
+        list.innerHTML = '<div class="text-center text-gray-400 py-10">Список слов пуст</div>';
+        return;
+      }
 
       words.forEach(w => {
         const isLearned = w.status === 'learned';
         const el = document.createElement('div');
-        // Add cursor-pointer and onclick
-        el.className = `p-3 rounded-lg border flex justify-between items-center cursor-pointer transition hover:scale-[1.02] active:scale-95 ${isLearned ? 'bg-green-50 border-green-100' : 'bg-yellow-50 border-yellow-100'}`;
-        el.title = isLearned ? "Нажмите, чтобы вернуть в 'В процессе'" : "Нажмите, чтобы отметить как 'Выучено'";
-        el.onclick = () => toggleWord(w.word);
+        el.className = `p-4 rounded-xl border-2 flex justify-between items-center cursor-pointer transition-all hover:scale-[1.01] active:scale-95 shadow-sm hover:shadow-md ${isLearned ? 'bg-green-50 border-green-100' : 'bg-white border-yellow-100'}`;
+        el.title = isLearned ? "Вернуть в изучение" : "Отметить выученным";
+
+        // Toggle Logic
+        el.onclick = async () => {
+          // Optimistic Update
+          const newStatus = isLearned ? 'learning' : 'learned';
+          w.status = newStatus;
+          renderFullWordsList(words); // Re-render locally immediately
+
+          // Server Update
+          try {
+            await fetch('/api/me/words/toggle', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ word: w.word })
+            });
+          } catch (e) { console.error(e); }
+        };
 
         el.innerHTML = `
              <div class="flex flex-col">
-                <span class="font-bold text-gray-700">${w.word}</span>
-                <span class="text-[10px] text-gray-400">Правильно: ${w.correct_count} | Ошибок: ${w.wrong_count}</span>
+                <span class="font-black text-gray-800 text-lg">${w.word}</span>
+                <span class="text-xs text-gray-400 font-bold mt-1">Правильно: ${w.correct_count} • Ошибок: ${w.wrong_count}</span>
              </div>
-             <div class="text-xs font-bold ${isLearned ? 'text-green-600' : 'text-yellow-600'}">
-                 ${isLearned ? '✓ Выучено' : '⚡ В процессе'}
+             <div class="text-xs font-black uppercase tracking-wider px-3 py-1 rounded-full ${isLearned ? 'bg-green-200 text-green-800' : 'bg-yellow-100 text-yellow-600'}">
+                 ${isLearned ? 'Выучено' : 'В процессе'}
              </div>
         `;
         list.appendChild(el);

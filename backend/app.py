@@ -26,18 +26,18 @@ import threading
 # Bot profiles - INVISIBLE to players (appear as normal users)
 BOTS = [
     # Weak/Medium Bots (850-1300 ELO)
-    {'name': 'Пепа', 'email': 'pepa_gamer@mail.ru', 'elo': 850, 'response_time': (3.5, 5), 'accuracy': 0.50},
-    {'name': 'Дэвид_Бэкхан', 'email': 'david_beckhan@gmail.com', 'elo': 1000, 'response_time': (2.5, 4), 'accuracy': 0.60},
-    {'name': 'Антор_ЧигурАм_амарян', 'email': 'anton_chigur@yandex.ru', 'elo': 1150, 'response_time': (2, 3), 'accuracy': 0.70},
-    {'name': 'Бесшумно--летящий--воин', 'email': 'silent_warrior@mail.ru', 'elo': 1250, 'response_time': (1.5, 2.5), 'accuracy': 0.75},
-    {'name': 'тройной_одеколон-Марк-Дакаскаса', 'email': 'triple_mark@gmail.com', 'elo': 1300, 'response_time': (1.5, 2.2), 'accuracy': 0.78},
+    {'name': 'Пепа', 'email': 'pepa_gamer@mail.ru', 'elo': 850, 'response_time': (4.0, 6.0), 'accuracy': 0.40},
+    {'name': 'Дэвид_Бэкхан', 'email': 'david_beckhan@gmail.com', 'elo': 1000, 'response_time': (3.0, 5.0), 'accuracy': 0.50},
+    {'name': 'Антор_ЧигурАм_амарян', 'email': 'anton_chigur@yandex.ru', 'elo': 1150, 'response_time': (2.5, 4.0), 'accuracy': 0.60},
+    {'name': 'Бесшумно--летящий--воин', 'email': 'silent_warrior@mail.ru', 'elo': 1250, 'response_time': (2.0, 3.5), 'accuracy': 0.65},
+    {'name': 'тройной_одеколон-Марк-Дакаскаса', 'email': 'triple_mark@gmail.com', 'elo': 1300, 'response_time': (1.8, 3.0), 'accuracy': 0.70},
     
     # Strong Bots (1600-1800 ELO)
-    {'name': 'Джедай_Без_Меча', 'email': 'jedi_no_saber@mail.ru', 'elo': 1600, 'response_time': (1, 1.8), 'accuracy': 0.88},
-    {'name': 'Pikachu-_ездит_на_жигули', 'email': 'pikachu_rides@gmail.com', 'elo': 1650, 'response_time': (0.8, 1.5), 'accuracy': 0.90},
-    {'name': 'НеВыноси_Мусор', 'email': 'dont_take_trash@yandex.ru', 'elo': 1700, 'response_time': (0.7, 1.3), 'accuracy': 0.92},
-    {'name': '_-Gandalf-_Sluшaet_Rap', 'email': 'gandalf_rap@mail.ru', 'elo': 1750, 'response_time': (0.6, 1.2), 'accuracy': 0.94},
-    {'name': 'генадий___параходов', 'email': 'gennadiy_ships@gmail.com', 'elo': 1800, 'response_time': (0.5, 1), 'accuracy': 0.96},
+    {'name': 'Джедай_Без_Меча', 'email': 'jedi_no_saber@mail.ru', 'elo': 1600, 'response_time': (1.2, 2.5), 'accuracy': 0.75},
+    {'name': 'Pikachu-_ездит_на_жигули', 'email': 'pikachu_rides@gmail.com', 'elo': 1650, 'response_time': (1.0, 2.0), 'accuracy': 0.80},
+    {'name': 'НеВыноси_Мусор', 'email': 'dont_take_trash@yandex.ru', 'elo': 1700, 'response_time': (0.8, 1.8), 'accuracy': 0.85},
+    {'name': '_-Gandalf-_Sluшaet_Rap', 'email': 'gandalf_rap@mail.ru', 'elo': 1750, 'response_time': (0.7, 1.5), 'accuracy': 0.88},
+    {'name': 'генадий___параходов', 'email': 'gennadiy_ships@gmail.com', 'elo': 1800, 'response_time': (0.6, 1.2), 'accuracy': 0.90},
 ]
 
 # Track bot emails and configs for quick lookup
@@ -131,6 +131,20 @@ def init_db():
             cursor.execute('UPDATE users SET name = ? WHERE email = ?', (bot['name'], bot['email']))
             
             print(f"Added/Updated bot: {bot['name']}")
+
+        # Test Data Injection (Check if exists)
+        test_user_check = cursor.execute("SELECT count(*) FROM users WHERE email LIKE 'Test_User_%'").fetchone()[0]
+        if test_user_check < 30:
+            print("Injecting 30 Test Users for Leaderboard verification...")
+            for i in range(1, 41):
+                t_email = f"Test_User_{i}@example.com"
+                t_name = f"Test User {i}"
+                t_elo = random.randint(1200, 1500)
+                try:
+                    cursor.execute("INSERT INTO users (email, name, elo) VALUES (?, ?, ?)", (t_email, t_name, t_elo))
+                except sqlite3.IntegrityError:
+                    pass 
+            print("Test users injected.")
         
         db.commit()
 
@@ -194,8 +208,21 @@ def api_me():
         row = db.execute('SELECT name, elo FROM users WHERE email = ?', (user['email'],)).fetchone()
         
         # Fetch friends
-        friends_rows = db.execute('SELECT friend_email FROM friendships WHERE user_email = ?', (user['email'],)).fetchall()
-        friends = [r['friend_email'] for r in friends_rows]
+        # Fetch friends with details (Name, ELO)
+        friends_rows = db.execute('''
+            SELECT u.email, u.name, u.elo 
+            FROM friendships f
+            JOIN users u ON f.friend_email = u.email
+            WHERE f.user_email = ?
+        ''', (user['email'],)).fetchall()
+        
+        friends = []
+        for f in friends_rows:
+            friends.append({
+                'email': f['email'],
+                'name': f['name'] or f['email'],
+                'elo': f['elo']
+            })
 
         user_data = {
             'email': user['email'],
@@ -304,6 +331,33 @@ def get_public_profile(identifier):
                                (current['email'], target_email)).fetchone()
         is_friend = bool(friend_row)
         
+    # Fetch History (Last 20 games) for EVERYONE
+    history_rows = db.execute('''
+        SELECT id, player1_email, player2_email, player1_score, player2_score, winner_email, created_at 
+        FROM games 
+        WHERE player1_email = ? OR player2_email = ? 
+        ORDER BY created_at DESC LIMIT 20
+    ''', (target_email, target_email)).fetchall()
+    
+    history = []
+    for row in history_rows:
+        # Determine opponent
+        is_p1 = row['player1_email'] == target_email
+        opponent_email = row['player2_email'] if is_p1 else row['player1_email']
+        
+        # Get opponent name
+        opp_row = db.execute('SELECT name FROM users WHERE email = ?', (opponent_email,)).fetchone()
+        opponent_name = opp_row['name'] if opp_row else opponent_email
+        
+        history.append({
+            'opponent_name': opponent_name,
+            'opponent_email': opponent_email,
+            'my_score': row['player1_score'] if is_p1 else row['player2_score'],
+            'opponent_score': row['player2_score'] if is_p1 else row['player1_score'],
+            'won': row['winner_email'] == target_email,
+            'date': row['created_at']
+        })
+
     return jsonify({
         'email': target_email,
         'name': user_row['name'] or target_email,
@@ -313,6 +367,7 @@ def get_public_profile(identifier):
             'wins': wins,
             'losses': losses
         },
+        'history': history,
         'is_friend': is_friend,
         'is_me': current['email'] == target_email
     })
@@ -416,21 +471,51 @@ def toggle_word_status():
 @app.route('/api/leaderboard')
 def get_leaderboard():
     db = get_db()
+    current_user = get_current_user()
+    
+    # Get Top 30
     top_players = db.execute('''
         SELECT name, email, elo 
         FROM users 
         WHERE (elo != 1200 OR name IS NOT NULL)
           AND email NOT LIKE 'Guest_%'
         ORDER BY elo DESC 
-        LIMIT 20
+        LIMIT 30
     ''').fetchall()
     
     result = []
     for player in top_players:
         result.append({
             'name': player['name'] or player['email'],
-            'elo': player['elo']
+            'elo': player['elo'],
+            'email': player['email']
         })
+        
+    # Check if current user is in top 30
+    is_in_top = False
+    if current_user:
+        for p in result:
+            if p['email'] == current_user['email']:
+                is_in_top = True
+                break
+                
+        # If not in top, append user with their rank
+        if not is_in_top:
+            user_row = db.execute('SELECT name, elo FROM users WHERE email = ?', (current_user['email'],)).fetchone()
+            if user_row:
+                my_elo = user_row['elo']
+                # Calculate Rank: count users with ELO > my_elo + 1
+                rank_row = db.execute('SELECT count(*) FROM users WHERE elo > ? AND email NOT LIKE \'Guest_%\'', (my_elo,)).fetchone()
+                rank = rank_row[0] + 1
+                
+                result.append({
+                     'name': user_row['name'] or current_user['email'],
+                     'elo': my_elo,
+                     'email': current_user['email'],
+                     'rank': rank,
+                     'is_me_outside': True
+                })
+
     return jsonify(result)
 
 @app.route('/login')
