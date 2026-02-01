@@ -169,6 +169,31 @@ def init_db():
         # Test Data Injection REMOVED for production
         
         db.commit()
+        
+        # Apply SQL migrations
+        apply_migrations(db)
+
+def apply_migrations(db):
+    """Apply all SQL migration files from migrations directory"""
+    import glob
+    migrations_dir = os.path.join(os.path.dirname(__file__), 'migrations')
+    
+    if not os.path.exists(migrations_dir):
+        return
+    
+    migration_files = sorted(glob.glob(os.path.join(migrations_dir, '*.sql')))
+    
+    for migration_file in migration_files:
+        migration_name = os.path.basename(migration_file)
+        try:
+            with open(migration_file, 'r') as f:
+                sql_script = f.read()
+                db.executescript(sql_script)
+            print(f"✓ Applied migration: {migration_name}")
+        except Exception as e:
+            print(f"✗ Migration {migration_name} error: {e}")
+    
+    db.commit()
 
 init_db()  # Initialize on startup
 
@@ -746,6 +771,16 @@ def save_zombie_game():
     
     game_id = cursor.lastrowid
     return jsonify({'success': True, 'game_id': game_id})
+
+@app.route('/api/words')
+def get_words():
+    """Serve words.json content ensuring SSoT"""
+    try:
+        with open("words.json", "r") as file:
+            data = json.load(file)
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/api/zombie/leaderboard')
 def get_zombie_leaderboard():

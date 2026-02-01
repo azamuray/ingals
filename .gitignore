@@ -1,14 +1,27 @@
+# IDE & System
 .idea
-.env
+.vscode/
 .DS_Store
-__pycache__
-*.txt
+.agent
 
-# SQLite databases (should be in volumes, not in git)
+# Secrets & Config
+.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Database
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
+backend/data/
 
-# ide
-.agent
+# Frontend (generated/redundant)
+frontend/words.json
+
+# Temporary / Large Text Files
+Oxford 3000 без номеров.txt
+🚀 Обновленая версия Ingals 2.1.0.txt
