@@ -16,19 +16,27 @@
             font-family: 'Outfit', sans-serif;
             display: flex;
             flex-direction: column;
+            width: 100%;
             height: 100vh;
+            /* Fallback */
+            height: 100dvh;
+            /* Dynamic Viewport Height */
             overflow: hidden;
             background: #000;
             margin: 0;
             padding: 0;
+            padding-bottom: env(safe-area-inset-bottom);
+            /* Fix for iPhone Home Bar */
         }
 
         #gameCanvas {
             display: block;
             background: #000;
             width: 100%;
-            height: 70vh;
-            /* Reduced slightly to give more space below */
+            flex-grow: 1;
+            /* Take remaining space */
+            border-bottom-left-radius: 16px;
+            border-bottom-right-radius: 16px;
             touch-action: none;
             position: relative;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -81,9 +89,10 @@
 
         #wordQuiz {
             position: relative;
-            height: calc(35vh - 40px);
-            /* Increased from 30vh to reduce gap */
-            /* Remaining space minus HUD */
+            height: auto;
+            min-height: 250px;
+            /* Minimal height for buttons */
+            max-height: 35vh;
             background: #0a0a0a;
             padding: 10px 15px;
             /* Reduced padding */
@@ -301,23 +310,12 @@
             const ctx = canvas.getContext('2d');
 
             function resizeCanvas() {
-                const maxWidth = 800;
-                const maxHeight = window.innerHeight * 0.70; // 70% of viewport
-
-                // Start with full width or max width
-                let width = Math.min(window.innerWidth, maxWidth);
-                let height = (width / 800) * 600; // Maintain 800:600 aspect ratio
-
-                // If calculated height exceeds max, scale down proportionally
-                if (height > maxHeight) {
-                    height = maxHeight;
-                    width = (height / 600) * 800;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
+                // Resize internal resolution to match displayed size (CSS flexbox controlled)
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
             }
-            resizeCanvas();
+            // Call initially and on resize
+            setTimeout(resizeCanvas, 100); // Small delay to let flex layout settle
             window.addEventListener('resize', resizeCanvas);
 
             // ==================== GAME CONSTANTS ====================
@@ -350,31 +348,36 @@
 
             async function loadWords() {
                 try {
-                    // Fetch words from backend Single Source of Truth
+                    // Fetch all words from backend API (Single Source of Truth)
                     const response = await fetch('/api/words');
                     if (!response.ok) throw new Error('Failed to fetch words');
                     const data = await response.json();
 
-                    // words.json format: { "english": "russian" }
-                    wordsData = Object.entries(data).map(([word, translation]) => ({
-                        word,      // English
-                        translation // Russian
-                    }));
-
-                    console.log(`Loaded ${wordsData.length} words from backend`);
-                    // Initial game setup
+                    processWords(data);
+                    console.log(`Loaded ${wordsData.length} words from backend API`);
                 } catch (error) {
                     console.error('Error loading words:', error);
-                    // Minimal fallback
-                    wordsData = [
-                        { word: "start", translation: "начать" },
-                        { word: "game", translation: "игра" },
-                        { word: "zombie", translation: "зомби" },
-                        { word: "run", translation: "бежать" },
-                        { word: "shoot", translation: "стрелять" },
-                        { word: "win", translation: "победить" }
-                    ];
+                    useFallbackWords();
                 }
+            }
+
+            function processWords(data) {
+                // words.json format: { "english": "russian" }
+                wordsData = Object.entries(data).map(([word, translation]) => ({
+                    word,      // English
+                    translation // Russian
+                }));
+            }
+
+            function useFallbackWords() {
+                wordsData = [
+                    { word: "start", translation: "начать" },
+                    { word: "game", translation: "игра" },
+                    { word: "zombie", translation: "зомби" },
+                    { word: "run", translation: "бежать" },
+                    { word: "shoot", translation: "стрелять" },
+                    { word: "win", translation: "победить" }
+                ];
             }
 
 

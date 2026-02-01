@@ -773,13 +773,24 @@ def save_zombie_game():
     return jsonify({'success': True, 'game_id': game_id})
 
 @app.route('/api/words')
-def get_words():
-    """Serve words.json content ensuring SSoT"""
+def serve_words_full():
+    """Serve ALL words for gameplay (SSoT)"""
     try:
+        # Use globally loaded WORDS to avoid disk I/O
+        if WORDS:
+            return jsonify(WORDS)
+            
+        # Fallback if global load failed (should not happen)
         with open("words.json", "r") as file:
-            data = json.load(file)
-        return jsonify(data)
+            full_data = json.load(file)
+        return jsonify(full_data)
+        
     except Exception as e:
+        print(f"Error serving words: {e}")
+        return jsonify({"error": str(e)}), 500
+        
+    except Exception as e:
+        print(f"Error serving words: {e}")
         return jsonify({"error": str(e)}), 500
 
 @app.route('/api/zombie/leaderboard')

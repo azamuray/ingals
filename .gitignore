@@ -19,9 +19,6 @@ __pycache__/
 *.db-shm
 backend/data/
 
-# Frontend (generated/redundant)
-frontend/words.json
 
 # Temporary / Large Text Files
-Oxford 3000 без номеров.txt
-🚀 Обновленая версия Ingals 2.1.0.txt
+*.txt
