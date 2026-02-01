@@ -719,7 +719,90 @@ def get_leaderboard():
                      'is_me_outside': True
                 })
 
+
     return jsonify(result)
+
+# ---Zombie Game Routes ---
+
+@app.route('/api/zombie/save-game', methods=['POST'])
+def save_zombie_game():
+    user = get_current_user()
+    if not user:
+        return jsonify({'error': 'Not authenticated'}), 401
+    
+    data = request.json
+    kills = data.get('kills', 0)
+    wave = data.get('wave', 1)
+    accuracy = data.get('accuracy', 0.0)
+    duration = data.get('duration', 0)
+    
+    db = get_db()
+    cursor = db.cursor()
+    cursor.execute('''
+        INSERT INTO zombie_games (user_id, kills, wave, accuracy, duration)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (user['email'], kills, wave, accuracy, duration))
+    db.commit()
+    
+    game_id = cursor.lastrowid
+    return jsonify({'success': True, 'game_id': game_id})
+
+@app.route('/api/zombie/leaderboard')
+def get_zombie_leaderboard():
+    limit = request.args.get('limit', 10, type=int)
+    
+    db = get_db()
+    # Aggregate by user: total kills, games played, best wave
+    leaderboard = db.execute('''
+        SELECT 
+            u.name,
+            u.email,
+            SUM(zg.kills) as total_kills,
+            COUNT(zg.id) as games_played,
+            MAX(zg.wave) as best_wave,
+            MAX(zg.kills) as best_kills
+        FROM zombie_games zg
+        JOIN users u ON zg.user_id = u.email
+        WHERE u.email NOT LIKE 'Guest_%'
+        GROUP BY u.email
+        ORDER BY total_kills DESC
+        LIMIT ?
+    ''', (limit,)).fetchall()
+    
+    result = []
+    for row in leaderboard:
+        result.append({
+            'name': row['name'] or row['email'],
+            'email': row['email'],
+            'total_kills': row['total_kills'],
+            'games_played': row['games_played'],
+            'best_wave': row['best_wave'],
+            'best_kills': row['best_kills']
+        })
+    
+    return jsonify(result)
+
+@app.route('/api/admin/zombie-games')
+@admin_required
+def admin_get_zombie_games():
+    db = get_db()
+    games = db.execute('''
+        SELECT 
+            zg.id,
+            u.name as username,
+            u.email,
+            zg.kills,
+            zg.wave,
+            zg.accuracy,
+            zg.duration,
+            zg.created_at
+        FROM zombie_games zg
+        JOIN users u ON zg.user_id = u.email
+        ORDER BY zg.created_at DESC
+        LIMIT 500
+    ''').fetchall()
+    
+    return jsonify([dict(g) for g in games])
 
 @app.route('/login')
 def login():

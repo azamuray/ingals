@@ -58,6 +58,9 @@
                 class="pb-2 border-b-4 border-indigo-600 font-bold text-indigo-600 transition">Пользователи</button>
             <button onclick="switchTab('games')" id="tab-btn-games"
                 class="pb-2 border-b-4 border-transparent text-gray-500 hover:text-gray-700 font-bold transition">Игры</button>
+            <button onclick="switchTab('zombie-games')" id="tab-btn-zombie-games"
+                class="pb-2 border-b-4 border-transparent text-gray-500 hover:text-gray-700 font-bold transition">🧟
+                Zombie Games</button>
             <button onclick="switchTab('analytics')" id="tab-btn-analytics"
                 class="pb-2 border-b-4 border-transparent text-gray-500 hover:text-gray-700 font-bold transition">Аналитика</button>
         </div>
@@ -131,6 +134,40 @@
                             </tr>
                         </thead>
                         <tbody id="games-table-body" class="text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2.5 ZOMBIE GAMES TAB -->
+        <div id="tab-content-zombie-games" class="tab-content hidden h-full">
+            <div class="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden flex flex-col h-[70vh]">
+                <div
+                    class="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-shrink-0">
+                    <h2 class="text-xl font-bold text-gray-700">🧟 Zombie Game Sessions</h2>
+                    <button onclick="loadZombieGames()"
+                        class="text-indigo-600 hover:text-indigo-800 font-bold text-sm flex items-center gap-1">
+                        Обновить
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15">
+                            </path>
+                        </svg>
+                    </button>
+                </div>
+                <div class="overflow-auto flex-1">
+                    <table class="w-full text-left border-collapse relative">
+                        <thead class="sticky top-0 bg-gray-50 z-10 shadow-sm">
+                            <tr class="bg-gray-50 text-gray-500 text-xs uppercase tracking-wider">
+                                <th class="px-6 py-3 font-bold border-b">Игрок</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Убийств</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Волна</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Точность</th>
+                                <th class="px-6 py-3 font-bold border-b text-center">Длительность</th>
+                                <th class="px-6 py-3 font-bold border-b text-right">Дата</th>
+                            </tr>
+                        </thead>
+                        <tbody id="zombie-games-table-body" class="text-sm"></tbody>
                     </table>
                 </div>
             </div>
@@ -289,8 +326,8 @@
         }
 
         async function confirmDeleteUser() {
-            if(!userToDelete) return;
-            
+            if (!userToDelete) return;
+
             const btn = document.getElementById('confirm-delete-btn');
             const originalText = btn.textContent;
             btn.textContent = 'Удаление...';
@@ -324,7 +361,7 @@
             document.getElementById('edit-email').value = email;
             document.getElementById('edit-name').value = currentName === 'null' ? '' : currentName; // Handle 'null' string if any
             document.getElementById('edit-elo').value = currentElo;
-            
+
             // Show
             document.getElementById('modal-edit-user').classList.remove('hidden');
         }
@@ -337,7 +374,7 @@
             const email = document.getElementById('edit-email').value;
             const newName = document.getElementById('edit-name').value;
             const newElo = document.getElementById('edit-elo').value;
-            
+
             const btn = document.getElementById('save-edit-btn');
             const originalText = btn.textContent;
             btn.textContent = 'Сохранение...';
@@ -422,7 +459,48 @@
             btn.classList.add('border-indigo-600', 'text-indigo-600');
 
             if (tabName === 'games') loadGames();
+            if (tabName === 'zombie-games') loadZombieGames();
             if (tabName === 'analytics') loadStats();
+        }
+
+        async function loadZombieGames() {
+            const tbody = document.getElementById('zombie-games-table-body');
+            tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">Загрузка...</td></tr>';
+            try {
+                const res = await fetch('/api/admin/zombie-games');
+                if (!res.ok) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-400">Ошибка загрузки</td></tr>';
+                    return;
+                }
+                const games = await res.json();
+
+                tbody.innerHTML = '';
+                if (games.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-gray-400">Нет данных</td></tr>';
+                    return;
+                }
+
+                games.forEach(g => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 border-b border-gray-100";
+
+                    const duration = g.duration ? `${Math.floor(g.duration / 60)}m ${g.duration % 60}s` : '-';
+                    const accuracy = g.accuracy ? g.accuracy.toFixed(1) + '%' : '-';
+
+                    tr.innerHTML = `
+                        <td class="px-6 py-4 text-gray-700 font-medium">${g.username || g.email}</td>
+                        <td class="px-6 py-4 text-center font-bold text-red-600">💀 ${g.kills}</td>
+                        <td class="px-6 py-4 text-center font-mono text-gray-600">${g.wave}</td>
+                        <td class="px-6 py-4 text-center font-mono text-gray-600">${accuracy}</td>
+                        <td class="px-6 py-4 text-center text-gray-500 text-xs">${duration}</td>
+                        <td class="px-6 py-4 text-right text-gray-400 text-xs">${new Date(g.created_at).toLocaleString()}</td>
+                     `;
+                    tbody.appendChild(tr);
+                });
+            } catch (e) {
+                console.error(e);
+                tbody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-red-400">Ошибка сети</td></tr>';
+            }
         }
 
         async function loadGames() {
