@@ -794,6 +794,19 @@ def serve_words_full():
         print(f"Error serving words: {e}")
         return jsonify({"error": str(e)}), 500
 
+@app.route('/api/sounds')
+def get_sounds():
+    try:
+        sounds_dir = '/app/sounds_scan'
+        if not os.path.exists(sounds_dir):
+            return jsonify([])
+        
+        files = [f for f in sorted(os.listdir(sounds_dir)) if f.lower().endswith('.mp3')]
+        return jsonify(files)
+    except Exception as e:
+        print(f"Error listing sounds: {e}")
+        return jsonify([])
+
 @app.route('/api/zombie/leaderboard')
 def get_zombie_leaderboard():
     limit = request.args.get('limit', 10, type=int)

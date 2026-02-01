@@ -20,6 +20,7 @@ services:
     volumes:
       - ./backend:/app
       - db-data:/app/data # Persistent volume for database
+      - ./frontend/sounds:/app/sounds_scan:ro # Mount sounds for listing
     command: gunicorn --worker-class eventlet -w 1 --reload app:app --bind 0.0.0.0:5000
     networks:
       - default

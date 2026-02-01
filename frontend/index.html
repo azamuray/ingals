@@ -151,7 +151,7 @@
             🧟‍♂️ ZOMBIE SURVIVAL MODE
           </a>
 
-          <!-- Round Selector -->
+
 
           <div class="mb-6 flex items-center justify-between bg-white border border-gray-100 p-3 rounded-xl shadow-sm">
             <label class="text-sm font-bold text-gray-600 flex items-center gap-2">
@@ -387,6 +387,9 @@
               <button onclick="openWordsView()" id="tab-btn-words"
                 class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors hidden flex-shrink-0">Слова
                 ↗</button>
+              <button onclick="switchProfileTab('settings')" id="tab-btn-settings"
+                class="pb-3 border-b-2 border-transparent hover:text-indigo-600 transition-colors hidden flex-shrink-0">Настройки
+                ⚙️</button>
             </div>
 
             <!-- Content -->
@@ -421,6 +424,43 @@
               <div id="profile-tab-history" class="hidden space-y-2">
                 <p class="text-center text-gray-400 text-sm py-4">История доступна только для вашего профиля.</p>
                 <div id="history-list" class="space-y-2"></div>
+              </div>
+
+              <!-- Settings Tab -->
+              <div id="profile-tab-settings" class="hidden space-y-6">
+                <!-- Notifications -->
+                <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm relative">
+                  <label class="block text-sm font-bold text-gray-600 mb-2">Браузерные уведомления</label>
+                  <button id="enable-notifications-btn" onclick="requestNotifyPermission()"
+                    class="w-full py-2 rounded-lg font-bold transition border border-indigo-200 text-indigo-600 hover:bg-indigo-50">
+                    🔔 Включить уведомления
+                  </button>
+                  <p id="notify-status" class="text-xs text-center mt-2 text-gray-400">Статус: <span
+                      id="notify-status-text">Неизвестно</span></p>
+                </div>
+
+                <!-- Sound -->
+                <div class="bg-white p-4 rounded-xl border border-gray-100 shadow-sm relative">
+                  <label class="block text-sm font-bold text-gray-600 mb-2">Звук вызова</label>
+                  <select id="sound-selector"
+                    class="w-full px-3 py-2 rounded-lg border border-gray-300 mb-2 font-bold text-gray-700"
+                    onchange="updateSoundInput()">
+                    <option value="default">🔔 Стандартный (Дзинь)</option>
+                    <option value="/sounds/headshot.mp3">💀 Headshot (Агрессивный)</option>
+                    <option value="custom">🔗 Своя ссылка</option>
+                  </select>
+
+                  <input type="text" id="custom-sound-url" placeholder="https://example.com/sound.mp3"
+                    class="w-full px-3 py-2 rounded-lg border border-gray-300 mb-2 text-sm hidden">
+
+                  <div class="flex gap-2">
+                    <button onclick="testSound()"
+                      class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold py-2 rounded-lg transition">🎵
+                      Тест</button>
+                    <button onclick="saveSettings(true)"
+                      class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 rounded-lg transition">Сохранить</button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -804,6 +844,18 @@
         console.log('Challenge received event:', data);
         if (data.target_sid === socket.id) {
           console.log('Challenge is for me!');
+
+          // Sound & Notification
+          playChallengeSound();
+          if (Notification.permission === 'granted') {
+            try {
+              new Notification("⚔️ Вызов на дуэль!", {
+                body: `Игрок ${data.challenger_email} вызывает вас!`,
+                tag: 'challenge' // Prevent duplicate spam
+              });
+            } catch (e) { console.error(e); }
+          }
+
           currentChallengerSid = data.challenger_sid;
           currentChallengeRounds = data.rounds || 15;
           challengerNameSpan.textContent = data.challenger_email;
@@ -1356,6 +1408,7 @@
 
         // Tabs visibility
         document.getElementById('tab-btn-words').classList.toggle('hidden', !data.is_me);
+        document.getElementById('tab-btn-settings').classList.toggle('hidden', !data.is_me);
 
         // Friendship Actions (Fixed ID)
         const fsDiv = document.getElementById('profile-friend-actions'); // WAS: friendship-status
@@ -1398,7 +1451,7 @@
 
     window.switchProfileTab = (tabName) => {
       // Hide all content
-      ['stats', 'history'].forEach(t => {
+      ['stats', 'history', 'settings'].forEach(t => {
         const tab = document.getElementById(`profile-tab-${t}`);
         if (tab) tab.classList.add('hidden');
         const btn = document.getElementById(`tab-btn-${t}`);
@@ -1511,6 +1564,138 @@
         list.appendChild(el);
       });
     }
+
+    // --- Settings Logic ---
+    function updateNotifyStatus() {
+      if (!("Notification" in window)) return;
+      const statusSpan = document.getElementById('notify-status-text');
+      const status = Notification.permission;
+
+      if (status === 'granted') {
+        statusSpan.textContent = '✅ Разрешено';
+        statusSpan.className = 'font-bold text-green-600';
+        document.getElementById('enable-notifications-btn').classList.add('hidden');
+      } else if (status === 'denied') {
+        statusSpan.textContent = '❌ Запрещено (Измените в настройках сайта)';
+        statusSpan.className = 'font-bold text-red-600';
+      } else {
+        statusSpan.textContent = '⚠️ Не настроено';
+        statusSpan.className = 'text-gray-400';
+      }
+    }
+
+    function requestNotifyPermission() {
+      if (!("Notification" in window)) {
+        alert("Ваш браузер не поддерживает уведомления");
+        return;
+      }
+      Notification.requestPermission().then(permission => {
+        updateNotifyStatus();
+        if (permission === 'granted') {
+          new Notification("Ingals", { body: "Уведомления включены! 🔔" });
+        }
+      });
+    }
+
+    function updateSoundInput() {
+      const val = document.getElementById('sound-selector').value;
+      const customInput = document.getElementById('custom-sound-url');
+      if (val === 'custom') {
+        customInput.classList.remove('hidden');
+      } else {
+        customInput.classList.add('hidden');
+      }
+    }
+
+    function getSoundUrl() {
+      const val = document.getElementById('sound-selector').value;
+      if (val === 'custom') {
+        return document.getElementById('custom-sound-url').value || 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+      }
+      if (val === 'default') {
+        return 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
+      }
+      return val;
+    }
+
+    function saveSettings() {
+      const soundVal = document.getElementById('sound-selector').value;
+      localStorage.setItem('ingals_sound_choice', soundVal);
+      if (soundVal === 'custom') {
+        localStorage.setItem('ingals_sound_custom_url', document.getElementById('custom-sound-url').value);
+      }
+
+      // Flash success
+      const btn = document.querySelector('button[onclick*="saveSettings"]');
+      if (btn) {
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '✅ Сохранено';
+        setTimeout(() => btn.innerHTML = originalText, 2000);
+      }
+    }
+
+    async function loadSoundOptions() {
+      try {
+        const res = await fetch('/api/sounds');
+        // Handle empty/error gracefully
+        if (!res.ok) return;
+
+        const files = await res.json();
+        const selector = document.getElementById('sound-selector');
+        if (!selector) return;
+
+        // Remove old dynamic options
+        selector.querySelectorAll('option[data-dynamic]').forEach(el => el.remove());
+
+        // Find insert point (before 'Custom')
+        const customOpt = selector.querySelector('option[value="custom"]');
+
+        files.forEach(f => {
+          // Avoid adding duplicates if files overlap with static ones (simplistic check)
+          if (f === 'headshot.mp3') return;
+
+          const opt = document.createElement('option');
+          opt.value = `/sounds/${f}`;
+          opt.textContent = `🎵 ${f.replace('.mp3', '')}`;
+          opt.dataset.dynamic = "true";
+
+          if (customOpt) selector.insertBefore(opt, customOpt);
+          else selector.appendChild(opt);
+        });
+      } catch (e) { console.warn("Failed to load dynamic sounds", e); }
+    }
+
+    async function loadSettings() {
+      await loadSoundOptions();
+
+      const savedChoice = localStorage.getItem('ingals_sound_choice');
+      if (savedChoice) {
+        const selector = document.getElementById('sound-selector');
+        selector.value = savedChoice;
+
+        // If saved value logic fell through (e.g. file deleted), it might be empty
+        if (!selector.value) selector.value = 'default';
+
+        if (savedChoice === 'custom') {
+          document.getElementById('custom-sound-url').value = localStorage.getItem('ingals_sound_custom_url') || '';
+        }
+      }
+      updateSoundInput();
+      updateNotifyStatus();
+    }
+
+    function playChallengeSound() {
+      const url = getSoundUrl();
+      const audio = new Audio(url);
+      audio.play().catch(e => console.warn("Audio play blocked (user verify needed)", e));
+    }
+
+    function testSound() {
+      playChallengeSound();
+    }
+
+    // Init Settings
+    loadSettings();
 
     // --- Initialization ---
     checkAuth();

@@ -45,3 +45,10 @@ Save these files in `/frontend/sounds/`:
 - Use MP3 format (better compression)
 - Mono audio (not stereo) to save space
 - Sample rate: 22050 Hz or 44100 Hz
+
+## Notification Sounds
+
+To add custom notification sounds:
+1. Put any `.mp3` file in this folder (`frontend/sounds`).
+2. Refresh the game page.
+3. Go to **Profile -> Settings**, and your sound will automatically appear in the list!
