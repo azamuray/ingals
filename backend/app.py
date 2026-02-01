@@ -25,20 +25,21 @@ WINNING_SCORE = int(os.getenv('WINNING_SCORE', 10))
 import threading
 
 # Bot profiles - INVISIBLE to players (appear as normal users)
+# Updated to be slower/weaker as per user request
 BOTS = [
     # Weak/Medium Bots (850-1300 ELO)
-    {'name': 'Пепа', 'email': 'pepa_gamer@mail.ru', 'elo': 850, 'response_time': (4.0, 6.0), 'accuracy': 0.40},
-    {'name': 'Дэвид_Бэкхан', 'email': 'david_beckhan@gmail.com', 'elo': 1000, 'response_time': (3.0, 5.0), 'accuracy': 0.50},
-    {'name': 'Антор_ЧигурАм_амарян', 'email': 'anton_chigur@yandex.ru', 'elo': 1150, 'response_time': (2.5, 4.0), 'accuracy': 0.60},
-    {'name': 'Бесшумно--летящий--воин', 'email': 'silent_warrior@mail.ru', 'elo': 1250, 'response_time': (2.0, 3.5), 'accuracy': 0.65},
-    {'name': 'тройной_одеколон-Марк-Дакаскаса', 'email': 'triple_mark@gmail.com', 'elo': 1300, 'response_time': (1.8, 3.0), 'accuracy': 0.70},
+    {'name': 'Пепа', 'email': 'pepa_gamer@mail.ru', 'elo': 850, 'response_time': (6.0, 8.0), 'accuracy': 0.35},
+    {'name': 'Дэвид_Бэкхан', 'email': 'david_beckhan@gmail.com', 'elo': 1000, 'response_time': (5.0, 7.0), 'accuracy': 0.45},
+    {'name': 'Антор_ЧигурАм_амарян', 'email': 'anton_chigur@yandex.ru', 'elo': 1150, 'response_time': (4.0, 6.0), 'accuracy': 0.55},
+    {'name': 'Бесшумно--летящий--воин', 'email': 'silent_warrior@mail.ru', 'elo': 1250, 'response_time': (3.5, 5.5), 'accuracy': 0.60},
+    {'name': 'тройной_одеколон-Марк-Дакаскаса', 'email': 'triple_mark@gmail.com', 'elo': 1300, 'response_time': (3.0, 5.0), 'accuracy': 0.65},
     
     # Strong Bots (1600-1800 ELO)
-    {'name': 'Джедай_Без_Меча', 'email': 'jedi_no_saber@mail.ru', 'elo': 1600, 'response_time': (1.2, 2.5), 'accuracy': 0.75},
-    {'name': 'Pikachu-_ездит_на_жигули', 'email': 'pikachu_rides@gmail.com', 'elo': 1650, 'response_time': (1.0, 2.0), 'accuracy': 0.80},
-    {'name': 'НеВыноси_Мусор', 'email': 'dont_take_trash@yandex.ru', 'elo': 1700, 'response_time': (0.8, 1.8), 'accuracy': 0.85},
-    {'name': '_-Gandalf-_Sluшaet_Rap', 'email': 'gandalf_rap@mail.ru', 'elo': 1750, 'response_time': (0.7, 1.5), 'accuracy': 0.88},
-    {'name': 'генадий___параходов', 'email': 'gennadiy_ships@gmail.com', 'elo': 1800, 'response_time': (0.6, 1.2), 'accuracy': 0.90},
+    {'name': 'Джедай_Без_Меча', 'email': 'jedi_no_saber@mail.ru', 'elo': 1600, 'response_time': (2.0, 3.5), 'accuracy': 0.75},
+    {'name': 'Pikachu-_ездит_на_жигули', 'email': 'pikachu_rides@gmail.com', 'elo': 1650, 'response_time': (1.8, 3.0), 'accuracy': 0.80},
+    {'name': 'НеВыноси_Мусор', 'email': 'dont_take_trash@yandex.ru', 'elo': 1700, 'response_time': (1.5, 2.5), 'accuracy': 0.85},
+    {'name': '_-Gandalf-_Sluшaet_Rap', 'email': 'gandalf_rap@mail.ru', 'elo': 1750, 'response_time': (1.2, 2.2), 'accuracy': 0.88},
+    {'name': 'генадий___параходов', 'email': 'gennadiy_ships@gmail.com', 'elo': 1800, 'response_time': (1.0, 2.0), 'accuracy': 0.90},
 ]
 
 # Track bot emails and configs for quick lookup
@@ -1267,6 +1268,36 @@ import threading
 active_bot_threads = set()
 bot_thread_lock = threading.Lock()
 
+def get_bot_params_by_elo(elo):
+    """Dynamically calculate response time and accuracy based on ELO."""
+    # Mapping points: (elo, min_time, max_time, accuracy)
+    # 800  -> 6.0, 8.0, 0.35
+    # 1300 -> 3.0, 5.0, 0.65
+    # 1800 -> 1.0, 2.0, 0.90
+    
+    # Simple linear interpolation helper
+    def lerp(v0, v1, t):
+        return v0 + t * (v1 - v0)
+    
+    def get_t(e, e_min, e_max):
+        return max(0.0, min(1.0, (e - e_min) / (e_max - e_min)))
+
+    if elo < 1300:
+        t = get_t(elo, 800, 1300)
+        min_t = lerp(6.0, 3.0, t)
+        max_t = lerp(8.0, 5.0, t)
+        acc = lerp(0.35, 0.65, t)
+    else:
+        t = get_t(elo, 1300, 1800)
+        # Nerfed top-tier bots:
+        # Was: (3.0->1.0, 5.0->2.0)
+        # Now: (3.0 -> 2.0, 5.0 -> 3.5) - Human-like pro speed, not machine speed
+        min_t = lerp(3.0, 2.0, t)
+        max_t = lerp(5.0, 3.5, t) 
+        acc = lerp(0.65, 0.90, t)
+        
+    return (min_t, max_t), acc
+
 def bot_play_game(room_id, bot_sid):
     """Bot plays the game automatically with delays and accuracy based on config."""
     thread_id = f"{room_id}_{bot_sid}"
@@ -1291,7 +1322,25 @@ def bot_play_game(room_id, bot_sid):
             print(f"Bot config not found for {bot_sid}")
             return
         
-        bot_config = bot_configs[bot_email]
+        # Create a local copy of config to modify based on dynamic ELO
+        bot_config = bot_configs[bot_email].copy()
+        
+        # DYNAMIC ELO ADJUSTMENT: Fetch actual ELO from DB
+        try:
+            with app.app_context():
+                db = get_db()
+                row = db.execute('SELECT elo FROM users WHERE email = ?', (bot_email,)).fetchone()
+                if row:
+                    current_elo = row['elo']
+                    
+                    # Update config dynamically based on current ELO
+                    # This ensures if a bot loses rating, it actually plays worse (slower)
+                    bot_config['response_time'], bot_config['accuracy'] = get_bot_params_by_elo(current_elo)
+                    
+                    print(f"DEBUG: Bot {bot_config['name']} dynamic adjustment (ELO {current_elo}): Time={bot_config['response_time']}, Acc={bot_config['accuracy']:.2f}")
+        except Exception as e:
+            print(f"Error fetching bot ELO: {e}")
+
         print(f"DEBUG: Bot {bot_config['name']} started playing in {room_id}")
         
         while room_id in active_games:
