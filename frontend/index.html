@@ -526,9 +526,25 @@
 
     // Check Auth on Load
     async function checkAuth() {
+      // Configuration for SSO
+      let CHUVALA_URL = 'https://chuvala.ru';
+      const hostname = window.location.hostname;
+      const port = window.location.port;
+
+      // Detect Local Environment
+      // Supports: localhost, 127.0.0.1, ingals.ru (via HTTP), or custom ports
+      if (hostname === 'localhost' ||
+        hostname === '127.0.0.1' ||
+        (hostname === 'ingals.ru' && window.location.protocol === 'http:') ||
+        (port && port !== '80' && port !== '443')) {
+
+        CHUVALA_URL = 'http://localhost:8001';
+      }
+
       // Check if token is present in URL (SSO redirect)
       const urlParams = new URLSearchParams(window.location.search);
       const token = urlParams.get('token');
+      const ssoFailed = urlParams.get('sso_failed');
 
       if (token) {
         // Redirect to backend callback to set session
@@ -541,15 +557,30 @@
         if (res.ok) {
           const user = await res.json();
           state.user = user;
+          // If logged in successfully but URL has failure param, clean it up for nicer URL
+          if (ssoFailed) {
+            window.history.replaceState({}, document.title, window.location.pathname);
+          }
           initGameUI(user);
         } else {
+          // Auth failed. Check if we should try SSO.
+          if (!ssoFailed) {
+            console.log("No local session. Checking SSO...");
+            const returnUrl = window.location.origin + '/';
+            const failUrl = window.location.origin + '/?sso_failed=true';
+
+            window.location.href = `${CHUVALA_URL}/auth/check?redirect_to=${encodeURIComponent(returnUrl)}&fail_to=${encodeURIComponent(failUrl)}`;
+            return;
+          }
+          // If sso_failed is present, it means we already checked and failed. Show UI.
           showAuthUI();
         }
       } catch (err) {
         console.error("Auth check failed", err);
         showAuthUI();
       } finally {
-        views.loading.classList.add('hidden');
+        // Delay removing loading slightly to avoid flicker
+        setTimeout(() => views.loading.classList.add('hidden'), 100);
       }
     }
 

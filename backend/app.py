@@ -935,7 +935,22 @@ def auth_callback():
 @app.route('/logout')
 def logout():
     session.pop('user', None)
-    return redirect('/')
+    
+    # SSO Global Logout
+    # Construct logout URL from SSO_LOGIN_URL base
+    sso_logout_url = SSO_LOGIN_URL.replace('/login', '/logout')
+    
+    # Return to landing page after global logout
+    return_url = url_for('login', _external=True) # or just /
+    # Actually, let's redirect to / so they see the landing page as guest (or login page)
+    # But wait, if they logout, they want to be effectively logged out.
+    # Chuvala logout redirects to Google logout -> then to target.
+    # The target should probably be the Ingals landing page (/)
+    return_url = url_for('login', _external=True).replace('/login', '/') # Hacky but works if index is not named
+    # Let's just use request.host_url
+    return_url = request.host_url
+    
+    return redirect(f"{sso_logout_url}?redirect_uri={return_url}")
 
 @app.route('/login/guest')
 def login_guest():
